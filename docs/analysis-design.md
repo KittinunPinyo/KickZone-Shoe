@@ -1,34 +1,35 @@
-## Analysis & Design (การวิเคราะห์และออกแบบระบบ)
+# เอกสารวิเคราะห์และออกแบบระบบ (Analysis & Design)
+## โครงงาน: KickZone (คิ๊กโซน) - ระบบเว็บไซต์ร้านค้าออนไลน์สำหรับจัดจำหน่ายรองเท้า
 
-### Database Design (การออกแบบฐานข้อมูล)
-ระบบ KICKZONE ใช้ฐานข้อมูลเชิงสัมพันธ์ (Relational Database) ผ่าน PostgreSQL (Neon Database) โดยมีโครงสร้างตารางหลักดังนี้:
+## 1. การวิเคราะห์ความต้องการ (Requirements Analysis)
 
-**Table: `users` (ตารางข้อมูลผู้ใช้งาน)**
-| Column Name | Data Type | Constraint | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | SERIAL | PRIMARY KEY | รหัสประจำตัวผู้ใช้งาน |
-| `name` | VARCHAR(255) | NOT NULL | ชื่อ-นามสกุล |
-| `email` | VARCHAR(255) | UNIQUE, NOT NULL | อีเมล (ใช้สำหรับเข้าสู่ระบบ) |
-| `password` | VARCHAR(255) | NOT NULL | รหัสผ่าน |
-| `role` | VARCHAR(50) | DEFAULT 'customer' | สิทธิ์การใช้งาน (customer / admin) |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | วันที่สมัครสมาชิก |
+### 1.1 ความต้องการของผู้ใช้งาน (User Requirements)
 
-**Table: `products` (ตารางข้อมูลสินค้า)**
-| Column Name | Data Type | Constraint | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | SERIAL | PRIMARY KEY | รหัสสินค้า |
-| `name` | VARCHAR(255) | NOT NULL | ชื่อสินค้า |
-| `brand` | VARCHAR(100) | - | ชื่อแบรนด์ |
-| `price` | NUMERIC(10, 2) | NOT NULL | ราคาสินค้า |
-| `image` | TEXT | - | ลิงก์รูปภาพสินค้า |
-| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | วันที่เพิ่มสินค้า |
+ระบบมีผู้ใช้งานหลัก 2 กลุ่ม คือ ลูกค้า (Customer) และ ผู้ดูแลระบบ (Admin)
 
-**Table: `orders` (ตารางคำสั่งซื้อ)**
-| Column Name | Data Type | Constraint | Description |
-| :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(50) | PRIMARY KEY | เลขที่ออเดอร์ (เช่น KZ-123456) |
-| `customer_email` | VARCHAR(255) | - | อีเมลลูกค้าที่สั่งซื้อ |
-| `items` | JSONB | NOT NULL | รายละเอียดสินค้าในตะกร้า |
-| `total` | NUMERIC(10, 2) | NOT NULL | ยอดรวมสุทธิ |
-| `status` | VARCHAR(50) | DEFAULT 'รอชำระเงิน' | สถานะการจัดส่ง |
+**ลูกค้า (Customer)**
+* สมัครสมาชิก / เข้าสู่ระบบ
+* ค้นหาและเลือกซื้อสินค้ารองเท้า
+* เพิ่มสินค้าลงตะกร้า (Cart)
+* สั่งซื้อสินค้า (Checkout)
+* ดูประวัติการสั่งซื้อ
 
+**ผู้ดูแลระบบ (Admin)**
+* จัดการข้อมูลสินค้า (เพิ่ม/แก้ไข/ลบ)
+* จัดการหมวดหมู่/แบรนด์สินค้า
+* ดูรายงานยอดขายและคำสั่งซื้อ
+* จัดการผู้ใช้งานในระบบ
+
+### 1.2 ขอบเขตของระบบ (System Scope)
+
+ระบบครอบคลุมฟังก์ชันหลัก 9 ส่วน ตามที่กำหนดในรายวิชา ได้แก่
+
+1. การจัดการสมาชิก (Register / Login)
+2. การจัดการข้อมูลสินค้า
+3. การค้นหาและแสดงรายละเอียดสินค้า
+4. ระบบตะกร้าสินค้า (Shopping Cart)
+5. ระบบสั่งซื้อสินค้า (Order Management)
+6. ระบบชำระเงิน (Simulation)
+7. ระบบติดตามสถานะคำสั่งซื้อ
+8. ระบบจัดการสินค้าและคำสั่งซื้อสำหรับผู้ดูแลระบบ
+9. รายงาน / Dashboard สรุปข้อมูล
