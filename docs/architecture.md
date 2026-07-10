@@ -27,6 +27,7 @@ graph TD
     style A fill:#61DAFB,stroke:#333,stroke-width:2px,color:#000
     style B fill:#339933,stroke:#333,stroke-width:2px,color:#fff
     style C fill:#336791,stroke:#333,stroke-width:2px,color:#fff
+```
 
 ### 2. คำอธิบายแต่ละชั้น (Layer)
 
