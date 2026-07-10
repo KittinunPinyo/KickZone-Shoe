@@ -7,7 +7,7 @@
 
 - [การวิเคราะห์ความต้องการ](#การวิเคราะห์ความต้องการ)
 - [แผนภาพยูสเคส](#แผนภาพยูสเคส)
-- [เทคโนโลยี (Tech Stack)](#เทคโนโลยี)
+- [โครงสร้างคลาส](#โครงสร้างคลาส)
 - [เอกสารประกอบโครงงาน](#เอกสารประกอบโครงงาน)
 
 ---
@@ -48,7 +48,6 @@
 ### 2. แผนภาพยูสเคส (Use Case Diagram)
 ![Use Case Diagram](UseCase.png)
 
-**Mermaid Diagram:**
 ```mermaid
 flowchart LR
     %% Actors
@@ -128,3 +127,159 @@ flowchart LR
     
     UC11_1 -. Extend .-> UC11
 ```
+
+---
+
+### 3. โครงสร้างคลาส (Class Diagram)
+ส่วนนี้แสดงโครงสร้างข้อมูล ความสัมพันธ์ระหว่าง Class (Relationships) และ Attributes/Methods ที่ใช้ในระบบจัดการร้านรองเท้ากีฬา
+![Class Diagram](ClassDiagram.png)
+
+```mermaid
+classDiagram
+    class User {
+        +int id
+        +String email
+        +String role
+        +login() void
+        +logout() void
+    }
+    
+    class Order {
+        +int id
+        +String orderNumber
+        +String orderStatus
+        +float netTotal
+        +String shippingAddress
+        +String paymentMethod
+        +saveOrder() void
+        +updateOrderStatus() void
+    }
+    
+    class OrderItem {
+        +int orderId
+        +int variantId
+        +String productName
+        +String modelName
+        +String size
+        +String color
+        +int quantity
+        +float totalPrice
+    }
+    
+    class Brand {
+        +int id
+        +String slug
+        +String brandName
+    }
+    
+    class Category {
+        +int id
+        +String slug
+        +String categoryName
+    }
+    
+    class ShoeProduct {
+        +int id
+        +String baseSKU
+        +String productName
+        +String description
+        +String modelName
+        +String genderCategory
+        +float basePrice
+        +float discountedPrice
+        +int totalStock
+        +List imageUrls
+        +getCheapestVariantPrice() float
+    }
+    
+    class ProductVariant {
+        +int variantId
+        +int productId
+        +String variantSKU
+        +String size
+        +String colorName
+        +int stockQuantity
+        +List variantImageUrls
+    }
+    
+    class CartContext {
+        +List cartItems
+        +addToCart(variantId: int, quantity: int) void
+        +updateQuantity(variantId: int, quantity: int) void
+        +removeFromCart(variantId: int) void
+        +clearCart() void
+    }
+    
+    class CartItem {
+        +int variantId
+        +String productName
+        +String modelName
+        +String size
+        +String color
+        +int quantity
+        +float totalPrice
+    }
+
+    User "1" --> "0..*" Order : makes order
+    Order "1" *-- "1..*" OrderItem : contains details
+    Brand "1" -- "0..*" ShoeProduct : is brand of
+    Category "1" -- "0..*" ShoeProduct : categorized in
+    ShoeProduct "1" *-- "0..*" ProductVariant : has variants
+    CartContext --> CartItem : stores items
+    CartItem "*" --> "1" ProductVariant : references
+    OrderItem "*" --> "1" ProductVariant : references purchased
+```
+
+---
+
+### 4. แผนภาพลำดับการทำงาน (Sequence Diagram)
+ส่วนนี้แสดงลำดับขั้นตอนการสื่อสารและทำงานร่วมกันของระบบต่างๆ ตั้งแต่ผู้ใช้เรียกดูสินค้าจนถึงขั้นตอนการชำระเงินและส่งข้อมูลไปยังคลังสินค้า
+![Sequence Diagram](SequenceDiagram.png)
+
+```mermaid
+sequenceDiagram
+    actor User as User (App)
+    participant API as API Gateway
+    participant Product as Product & Stock System
+    participant Cart as Cart System
+    participant Order as Order System
+    participant Payment as Payment System
+    participant Warehouse as Warehouse & Shipping System
+
+    User->>API: 1. Browse products
+    API->>Product: 2. Search products (product name, getCheapestVariantPrice())
+    Product-->>API: 3. Product info (product name, brand, base price)
+    API-->>User: 4. Display product
+    
+    User->>API: 5. Add to cart (specify shoe size and color)
+    API->>Cart: 6. addToCart (variant id, quantity)
+    Cart->>Cart: Create cart item (CartItem)
+    Cart-->>API: 7. Confirm add to cart successful
+    API-->>User: 8. Display cart (total price)
+    
+    User->>API: 9. Proceed to checkout
+    API->>Product: 10. Check stock (ProductVariant)
+    Product-->>API: Product available
+    API->>Order: 11. Create initial order (saveOrder() -> order ID)
+    Order->>Order: Create order details (OrderItem)
+    Order-->>API: 12. Order info (net total)
+    API-->>User: 13. Display checkout page (shipping address & payment method)
+    
+    User->>Payment: 14. Make payment (payment method)
+    API->>Payment: 15. Check payment status
+    Payment-->>API: 16. Update successful payment result
+    
+    API->>Order: 17. Confirm order success (update order status)
+    Order-->>API: 18. Confirm order success
+    API->>Warehouse: 19. Send order to warehouse (deduct stock for that size/color)
+    
+    API->>Cart: Call clearCart()
+    Cart-->>API: Cart cleared successfully
+    Warehouse-->>API: 20. Confirm shipping (generate tracking number)
+    
+    API-->>User: 21. Notify order success (order ID, net total)
+```
+
+---
+
+**ดู:** [Analysis & Design ←](analysis-design.md)

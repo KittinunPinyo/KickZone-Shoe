@@ -84,8 +84,15 @@
 
 | เอกสาร | เนื้อหา |
 |--------|---------|
-| [docs/analysis-design.md](./docs/analysis-design.md) | เอกสารวิเคราะห์และออกแบบ: Persona · Use Case · Class · Sequence · Data Schema · Architecture |
+| [docs/analysis-design.md](./docs/analysis-design.md) | เอกสารวิเคราะห์และออกแบบ: Persona · Use Case · Class · Sequence · Architecture |
 | [docs/architecture.md](./docs/architecture.md) | กระบวนการสถาปัตยกรรมระบบ (System Architecture) |
+| [Wireframe (Figma)](https://www.figma.com/proto/jDeU44CwqFDEpHVFQV9PWt/KickZone-Sports?node-id=0-1&t=Iy4DsgZlU4ssWWsK-1) | ออกแบบ Wireframe (หน้าหลัก, รายการสินค้า, รายละเอียดสินค้า, ตะกร้า, Checkout/ชำระเงิน) ผ่าน Figma |
+
+---
+
+## 📞 ติดต่อ | Contact
+ 
+**GitHub:** [KittinunPinyo](https://github.com/KittinunPinyo)
 
 ---
 

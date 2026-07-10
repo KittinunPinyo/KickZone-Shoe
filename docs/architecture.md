@@ -28,6 +28,7 @@ graph TD
     style B fill:#339933,stroke:#333,stroke-width:2px,color:#fff
     style C fill:#336791,stroke:#333,stroke-width:2px,color:#fff
 ```
+---
 
 ### 2. คำอธิบายแต่ละชั้น (Layer)
 
@@ -39,6 +40,8 @@ graph TD
 | **Authentication** | Custom Auth (Node.js + DB) | ระบบจัดการการสมัครสมาชิก ตรวจสอบอีเมล/รหัสผ่าน และแยกสิทธิ์ผู้ใช้ (Customer / Admin) |
 | **Storage / State** | LocalStorage, Image URLs | จัดเก็บข้อมูลตะกร้าสินค้าชั่วคราว (Cart) และใช้ URL สำหรับดึงรูปภาพรองเท้ามาแสดงผล |
 
+---
+
 ### 3. เหตุผลในการเลือกใช้สถาปัตยกรรมนี้
 
 | ปัจจัย | เหตุผล |
@@ -47,3 +50,7 @@ graph TD
 | **Scalability** | โครงสร้างแบบ RESTful API รองรับการขยายตัวในอนาคต และการเลือกใช้ Cloud Database (Neon) ช่วยให้รองรับปริมาณข้อมูลที่เพิ่มขึ้นได้ง่าย |
 | **Maintainability** | การแยกโครงสร้างชัดเจนและการเขียนคำสั่ง SQL ที่เข้าใจง่าย ช่วยให้สามารถตรวจสอบ แก้ไข หรือบำรุงรักษาระบบ (Maintain) ได้สะดวกและลดข้อผิดพลาด |
 | **Team Collaboration** | การใช้ Git และ GitHub เป็น Version Control กลาง ทำให้สมาชิกในทีมสามารถติดตามการเปลี่ยนแปลง และร่วมมือกันพัฒนาโปรเจกต์ได้อย่างมีประสิทธิภาพ |
+
+---
+
+**ดู:** [System Architecture →](architecture.md)
