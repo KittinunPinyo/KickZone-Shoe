@@ -86,3 +86,7 @@
 |--------|---------|
 | [docs/analysis-design.md](./docs/analysis-design.md) | เอกสารวิเคราะห์และออกแบบ: Persona · Use Case · Class · Sequence · Data Schema · Architecture |
 | [docs/architecture.md](./docs/architecture.md) | กระบวนการสถาปัตยกรรมระบบ (System Architecture) |
+
+---
+
+<p align="center"><sub>© 2026 KickZone (คิ๊กโซน) · โครงงานรายวิชา CSI204</sub></p>
