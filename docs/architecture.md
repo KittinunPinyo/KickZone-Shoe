@@ -53,4 +53,4 @@ graph TD
 
 ---
 
-**ดู:** [System Architecture →](architecture.md)
+**ดู:** [Analysis & Design ←](analysis-design.md)
