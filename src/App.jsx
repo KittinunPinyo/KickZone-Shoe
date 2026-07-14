@@ -13,17 +13,25 @@ import Profile from './pages/Profile';
 export default function App() {
   const navigate = useNavigate();
 
-  // ข้อมูลที่เหลือใน LocalStorage
+  // ====================================================
+  // 🌟 ดึงข้อมูล User จากระบบ Login ใหม่
+  // ====================================================
+  const [currentUser, setCurrentUser] = useState(() => {
+    // ไปดึงกุญแจชื่อ 'user' ที่ Navbar กับ Login ใช้
+    const savedUser = localStorage.getItem("user");
+    // ถ้ามีข้อมูล ให้แกะเอาแค่ role (เช่น 'customer' หรือ 'admin') ไปใช้งาน
+    return savedUser ? JSON.parse(savedUser).role : null; 
+  });
+
+  // ข้อมูลตะกร้าและสินค้าที่สนใจ
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem("cart")) || []);
   const [wishlist, setWishlist] = useState(() => JSON.parse(localStorage.getItem("wishlist")) || []);
-  const [currentUser, setCurrentUser] = useState(() => localStorage.getItem("currentUser") || null);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [newProduct, setNewProduct] = useState({ name: "", brand: "", price: "", image: "" });
 
-  // State ที่ดึงจาก Database
   const [products, setProducts] = useState([]);
-  const [orders, setOrders] = useState([]); // ดึงจาก DB แล้ว
+  const [orders, setOrders] = useState([]); 
 
   // ====================================================
   // 🌟 ดึงข้อมูลเริ่มต้น (Products & Orders)
@@ -81,7 +89,10 @@ export default function App() {
   // ====================================================
   const handleCheckout = async () => {
     if (cart.length === 0) return alert("ไม่มีสินค้าในตะกร้า!");
-    const userEmail = localStorage.getItem("userEmail") || "customer@kickzone.com"; // ดึงอีเมลคนซื้อ
+    
+    // ดึงอีเมลจากระบบเก็บข้อมูลใหม่
+    const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userEmail = savedUser.email || "customer@kickzone.com"; 
     
     const newOrder = {
       id: 'KZ-' + Date.now().toString().slice(-6),
@@ -102,7 +113,6 @@ export default function App() {
     } catch (err) { alert("เกิดข้อผิดพลาดในการสั่งซื้อ"); }
   };
 
-  // แอดมินเปลี่ยนสถานะออเดอร์
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
       await fetch(`http://localhost:5000/api/orders/${orderId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
@@ -111,35 +121,9 @@ export default function App() {
     } catch (err) { alert("เกิดข้อผิดพลาดในการอัปเดตสถานะ"); }
   };
 
-  // ====================================================
-  // 🌟 ฟังก์ชันเข้าสู่ระบบ
-  // ====================================================
-  const handleLogin = async (email, password) => {
-    try {
-      const res = await fetch('http://localhost:5000/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
-      const data = await res.json();
-      if (res.ok) {
-        setCurrentUser(data.role);
-        localStorage.setItem("userEmail", data.email); // เก็บอีเมลไว้ใช้อ้างอิงตอนสั่งซื้อ
-        navigate(data.role === 'admin' ? '/admin' : '/');
-      } else { alert(data.error); }
-    } catch (err) { alert("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem("userEmail");
-    setCart([]);
-    navigate('/');
-  };
-
-  // LocalStorage ของที่เหลือ
+  // LocalStorage Sync
   useEffect(() => { localStorage.setItem("cart", JSON.stringify(cart)); }, [cart]);
   useEffect(() => { localStorage.setItem("wishlist", JSON.stringify(wishlist)); }, [wishlist]);
-  useEffect(() => { 
-    if (currentUser) localStorage.setItem("currentUser", currentUser);
-    else localStorage.removeItem("currentUser");
-  }, [currentUser]);
 
   const handleAddToCart = (product) => { setCart([...cart, product]); alert(`เพิ่ม ${product.name} ลงตะกร้าแล้ว!`); };
   const toggleWishlist = (product) => {
@@ -152,11 +136,16 @@ export default function App() {
 
   return (
     <div className="min-vh-100 bg-white">
-      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} currentUser={currentUser} cart={cart} handleLogout={handleLogout} />
+      {/* เอา Props บางตัวที่ไม่ได้ใช้ออกจาก Navbar */}
+      <Navbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} cart={cart} />
+      
       <Routes>
         <Route path="/" element={<Home filteredProducts={filteredProducts} currentUser={currentUser} handleAddToCart={handleAddToCart} wishlist={wishlist} toggleWishlist={toggleWishlist} />} />
         <Route path="/product/:id" element={<ProductDetail products={products} currentUser={currentUser} handleAddToCart={handleAddToCart} />} />
-        <Route path="/login" element={<Login handleLogin={handleLogin} />} />
+        
+        {/* ไม่ต้องส่ง handleLogin ไปแล้ว เพราะในไฟล์ Login.jsx จัดการตัวเองหมดแล้ว */}
+        <Route path="/login" element={<Login />} />
+        
         <Route path="/register" element={<Register />} />
         <Route path="/cart" element={<Cart cart={cart} setCart={setCart} currentUser={currentUser} handleCheckout={handleCheckout} />} />
         <Route path="/profile" element={<Profile currentUser={currentUser} orders={orders} />} />
@@ -164,7 +153,7 @@ export default function App() {
           <Admin 
             currentUser={currentUser} products={products} newProduct={newProduct} setNewProduct={setNewProduct} 
             handleAddProduct={handleAddProduct} handleDeleteProduct={handleDeleteProduct} handleEditProduct={handleEditProduct}
-            orders={orders} handleUpdateOrderStatus={handleUpdateOrderStatus} /* ส่งฟังก์ชันอัปเดตไปให้แอดมิน */
+            orders={orders} handleUpdateOrderStatus={handleUpdateOrderStatus} 
           />
         } />
       </Routes>

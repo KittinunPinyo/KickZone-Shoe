@@ -1,13 +1,47 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-export default function Login({ handleLogin }) {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // ใช้ useNavigate สำหรับเปลี่ยนหน้าหลังล็อกอินสำเร็จ
+  const navigate = useNavigate();
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    handleLogin(email, password);
+    
+    try {
+      // 1. ส่งข้อมูลไปที่ Backend
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: email, password: password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 2. ล็อกอินสำเร็จ: เก็บ Token และข้อมูล User ลง localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        alert('เข้าสู่ระบบสำเร็จ!');
+        
+        // 3. เปลี่ยนหน้าไปที่หน้าแรก (Home)
+        navigate('/');
+        // รีเฟรชหน้าต่าง 1 ครั้งเพื่อให้ Navbar อัปเดตสถานะ (ถ้าจำเป็น)
+        window.location.reload(); 
+      } else {
+        // ล็อกอินไม่ผ่าน (รหัสผิด / ไม่มีอีเมล)
+        alert(`เข้าสู่ระบบไม่สำเร็จ: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    }
   };
 
   return (
