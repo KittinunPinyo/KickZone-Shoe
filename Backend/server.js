@@ -117,7 +117,7 @@ const initializeDatabase = async () => {
         `);
         console.log("✅ NeonDB: ตรวจสอบและจัดการโครงสร้างตาราง 'orders' เรียบร้อย พร้อมใช้งาน!");
 
-        // 2. ตาราง Reviews (สร้างใหม่)
+        // 2. ตาราง Reviews
         await pool.query(`
             CREATE TABLE IF NOT EXISTS reviews (
                 id SERIAL PRIMARY KEY,
@@ -125,11 +125,29 @@ const initializeDatabase = async () => {
                 user_id INTEGER NOT NULL,
                 rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
                 comment TEXT NOT NULL,
-                status VARCHAR(50) DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
         console.log("✅ NeonDB: ตรวจสอบและจัดการตาราง 'reviews' เรียบร้อย!");
+
+        // 3. ตาราง Promotions
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS promotions (
+                id SERIAL PRIMARY KEY,
+                code VARCHAR(50) UNIQUE NOT NULL,
+                description TEXT NOT NULL,
+                discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
+                discount_value NUMERIC(10, 2) NOT NULL,
+                max_uses INTEGER,
+                current_uses INTEGER DEFAULT 0,
+                start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                end_date TIMESTAMP,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log("✅ NeonDB: ตรวจสอบและจัดการตาราง 'promotions' เรียบร้อย!");
 
     } catch (err) {
         console.error("❌ Database Initialization Error:", err.message);
@@ -462,8 +480,8 @@ app.post('/api/reviews', authenticateToken, async (req, res) => {
         const userId = req.user.id; // ดึง ID มาจาก Token ที่ล็อกอิน
 
         const result = await pool.query(
-            'INSERT INTO reviews (product_id, user_id, rating, comment, status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [productId, userId, rating, comment, 'pending']
+            'INSERT INTO reviews (product_id, user_id, rating, comment) VALUES ($1, $2, $3, $4) RETURNING *',
+            [productId, userId, rating, comment]
         );
         res.status(201).json({ success: true, review: result.rows[0] });
     } catch (error) {
@@ -472,43 +490,33 @@ app.post('/api/reviews', authenticateToken, async (req, res) => {
     }
 });
 
-// 2) ดึงรีวิวที่ "อนุมัติแล้ว" ไปโชว์หน้าสินค้า (ไม่ต้องล็อกอิน ลูกค้าทั่วไปดูได้)
+// 2) ดึงรีวิวสินค้า ไปโชว์หน้าสินค้า (ไม่ต้องล็อกอิน ลูกค้าทั่วไปดูได้)
 app.get('/api/reviews/product/:productId', async (req, res) => {
     try {
         const { productId } = req.params;
         const query = `
-            SELECT r.id AS _id, r.rating, r.comment, r.created_at, u.name AS user_name
+            SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
             FROM reviews r
             JOIN users u ON r.user_id = u.id
-            WHERE r.product_id = $1 AND r.status = 'approved'
+            WHERE r.product_id = $1
             ORDER BY r.created_at DESC
         `;
         const { rows } = await pool.query(query, [productId]);
-        
-        // จัดรูปแบบ JSON ให้ตรงกับที่ Frontend React คาดหวัง
-        const formattedReviews = rows.map(row => ({
-            _id: row._id,
-            rating: row.rating,
-            comment: row.comment,
-            createdAt: row.created_at,
-            userId: { name: row.user_name }
-        }));
-        
-        res.json(formattedReviews);
+        res.json(rows);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'ดึงข้อมูลรีวิวไม่ได้' });
     }
 });
 
-// 3) แอดมินดึงรีวิว "ทั้งหมด" (ทุกสถานะ) ไปโชว์หน้า Manage Reviews (บังคับแอดมิน)
+// 3) แอดมินดึงรีวิว "ทั้งหมด" ไปโชว์หน้า Manage Reviews (บังคับแอดมิน)
 app.get('/api/admin/reviews', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
     
     try {
         // ดึงข้อมูลรีวิว พร้อมเชื่อมตาราง Users(ชื่อลูกค้า) และ Products(ชื่อสินค้า)
         const query = `
-            SELECT r.id AS _id, r.rating, r.comment, r.status, r.created_at, 
+            SELECT r.id, r.rating, r.comment, r.created_at, 
                    u.name AS user_name, p.name AS product_name
             FROM reviews r
             JOIN users u ON r.user_id = u.id
@@ -516,45 +524,215 @@ app.get('/api/admin/reviews', authenticateToken, async (req, res) => {
             ORDER BY r.created_at DESC
         `;
         const { rows } = await pool.query(query);
-        
-        const formattedReviews = rows.map(row => ({
-            _id: row._id,
-            rating: row.rating,
-            comment: row.comment,
-            status: row.status,
-            createdAt: row.created_at,
-            userId: { name: row.user_name },
-            productId: { name: row.product_name || 'ไม่ทราบชื่อสินค้า' }
-        }));
-        
-        res.json(formattedReviews);
+        res.json(rows);
     } catch (error) {
         console.error("Admin Fetch Reviews Error:", error);
         res.status(500).json({ error: 'ดึงข้อมูลรีวิวทั้งหมดไม่ได้' });
     }
 });
 
-// 4) แอดมินเปลี่ยนสถานะรีวิว (Approve / Reject)
-app.put('/api/admin/reviews/:id/status', authenticateToken, async (req, res) => {
+// 4) แอดมินลบรีวิว
+app.delete('/api/admin/reviews/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
     
     try {
-        const { status } = req.body; 
         const result = await pool.query(
-            'UPDATE reviews SET status = $1 WHERE id = $2 RETURNING *',
-            [status, req.params.id]
+            'DELETE FROM reviews WHERE id = $1 RETURNING id',
+            [req.params.id]
         );
         
         if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบรีวิวนี้' });
-        res.json({ success: true, review: result.rows[0] });
+        res.json({ success: true, message: 'ลบรีวิวสำเร็จ' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'อัปเดตสถานะล้มเหลว' });
+        res.status(500).json({ error: 'ลบรีวิวล้มเหลว' });
     }
 });
 
 // ==========================================
-// 7. เปิดพอร์ตใช้งาน Server
+// 7. API Routes สำหรับระบบโปรโมชั่น (Promotions)
+// ==========================================
+
+// 1) ผู้ใช้ดูโปรโมชั่นที่ใช้งานอยู่ (ไม่ต้องล็อกอิน)
+app.get('/api/promotions', async (req, res) => {
+    try {
+        const query = `
+            SELECT id, code, description, discount_type, discount_value, 
+                   max_uses, current_uses, start_date, end_date, is_active
+            FROM promotions
+            WHERE is_active = true 
+            AND NOW() >= start_date 
+            AND (end_date IS NULL OR NOW() <= end_date)
+            ORDER BY created_at DESC
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.error("Fetch Promotions Error:", error);
+        res.status(500).json({ error: 'ดึงข้อมูลโปรโมชั่นไม่ได้' });
+    }
+});
+
+// 2) ตรวจสอบและยืนยันโปรโมชั่น
+app.post('/api/promotions/validate', async (req, res) => {
+    try {
+        const { code, cartTotal } = req.body;
+        
+        if (!code) {
+            return res.status(400).json({ error: 'กรุณากรอกรหัสโปรโมชั่น' });
+        }
+
+        const result = await pool.query(
+            `SELECT * FROM promotions 
+             WHERE code = $1 AND is_active = true 
+             AND NOW() >= start_date 
+             AND (end_date IS NULL OR NOW() <= end_date)`,
+            [code]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'โปรโมชั่นไม่ถูกต้องหรือหมดอายุแล้ว' });
+        }
+
+        const promo = result.rows[0];
+
+        // ตรวจสอบว่าใช้งบประมาณหมดแล้วหรือไม่
+        if (promo.max_uses && promo.current_uses >= promo.max_uses) {
+            return res.status(400).json({ error: 'โปรโมชั่นนี้ใช้งบประมาณหมดแล้ว' });
+        }
+
+        let discountAmount = 0;
+        if (promo.discount_type === 'percentage') {
+            discountAmount = (cartTotal * promo.discount_value) / 100;
+        } else if (promo.discount_type === 'fixed') {
+            discountAmount = promo.discount_value;
+        }
+
+        res.json({
+            success: true,
+            message: 'โปรโมชั่นถูกต้อง',
+            promotion: {
+                id: promo.id,
+                code: promo.code,
+                description: promo.description,
+                discountType: promo.discount_type,
+                discountValue: promo.discount_value,
+                discountAmount: discountAmount
+            }
+        });
+    } catch (error) {
+        console.error("Validate Promotion Error:", error);
+        res.status(500).json({ error: 'ตรวจสอบโปรโมชั่นล้มเหลว' });
+    }
+});
+
+// 3) แอดมินดูโปรโมชั่นทั้งหมด
+app.get('/api/admin/promotions', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    try {
+        const query = `
+            SELECT id, code, description, discount_type, discount_value, 
+                   max_uses, current_uses, start_date, end_date, is_active, created_at, updated_at
+            FROM promotions
+            ORDER BY created_at DESC
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.error("Admin Fetch Promotions Error:", error);
+        res.status(500).json({ error: 'ดึงข้อมูลโปรโมชั่นไม่ได้' });
+    }
+});
+
+// 4) แอดมินสร้างโปรโมชั่นใหม่
+app.post('/api/admin/promotions', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    try {
+        const { code, description, discountType, discountValue, maxUses, startDate, endDate } = req.body;
+
+        if (!code || !description || !discountType || !discountValue) {
+            return res.status(400).json({ error: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+        }
+
+        if (!['percentage', 'fixed'].includes(discountType)) {
+            return res.status(400).json({ error: 'ประเภทส่วนลดไม่ถูกต้อง' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO promotions (code, description, discount_type, discount_value, max_uses, start_date, end_date, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+             RETURNING *`,
+            [code, description, discountType, discountValue, maxUses || null, startDate || new Date(), endDate || null]
+        );
+
+        res.status(201).json({ 
+            success: true, 
+            message: 'สร้างโปรโมชั่นสำเร็จ',
+            promotion: result.rows[0] 
+        });
+    } catch (error) {
+        if (error.message.includes('duplicate')) {
+            return res.status(400).json({ error: 'รหัสโปรโมชั่นนี้ถูกใช้งานแล้ว' });
+        }
+        console.error("Create Promotion Error:", error);
+        res.status(500).json({ error: 'สร้างโปรโมชั่นล้มเหลว' });
+    }
+});
+
+// 5) แอดมินแก้ไขโปรโมชั่น
+app.put('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    try {
+        const { id } = req.params;
+        const { code, description, discountType, discountValue, maxUses, startDate, endDate, isActive } = req.body;
+
+        const result = await pool.query(
+            `UPDATE promotions 
+             SET code = $1, description = $2, discount_type = $3, discount_value = $4, 
+                 max_uses = $5, start_date = $6, end_date = $7, is_active = $8, updated_at = NOW()
+             WHERE id = $9
+             RETURNING *`,
+            [code, description, discountType, discountValue, maxUses || null, startDate, endDate || null, isActive !== false, id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'แก้ไขโปรโมชั่นสำเร็จ',
+            promotion: result.rows[0] 
+        });
+    } catch (error) {
+        console.error("Update Promotion Error:", error);
+        res.status(500).json({ error: 'แก้ไขโปรโมชั่นล้มเหลว' });
+    }
+});
+
+// 6) แอดมินลบโปรโมชั่น
+app.delete('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    try {
+        const result = await pool.query(
+            'DELETE FROM promotions WHERE id = $1 RETURNING id',
+            [req.params.id]
+        );
+        
+        if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });
+        res.json({ success: true, message: 'ลบโปรโมชั่นสำเร็จ' });
+    } catch (error) {
+        console.error("Delete Promotion Error:", error);
+        res.status(500).json({ error: 'ลบโปรโมชั่นล้มเหลว' });
+    }
+});
+
+// ==========================================
+// 8. เปิดพอร์ตใช้งาน Server
 // ==========================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`KickZone Backend is running on port ${PORT}`));

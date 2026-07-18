@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PromotionsList from '../components/PromotionsList';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -278,6 +279,13 @@ export default function Cart() {
                   </div>
                 )}
               </div>
+
+              {/* Promotions Section */}
+              {cartItems.length > 0 && (
+                <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '0px', border: '1px solid #e5e5e5', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
+                  <PromotionsList />
+                </div>
+              )}
 
               {/* Delivery destination details */}
               <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '0px', border: '1px solid #e5e5e5' }}>

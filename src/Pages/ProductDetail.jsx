@@ -240,9 +240,7 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
         </div>
       </div>
 
-      {/* ======================================= */}
-      {/* 🟢 เพิ่มส่วนรีวิวสินค้าตรงนี้ (ด้านล่างสุดของหน้า) 🟢 */}
-      {/* ======================================= */}
+      {/* ส่วนรีวิวสินค้า */}
       <div className="mt-5 pt-4 border-top">
         <ProductReviews productId={id} />
       </div>

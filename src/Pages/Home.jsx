@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import PromotionsList from '../components/PromotionsList';
 
 export default function Home({ filteredProducts, currentUser, handleAddToCart, wishlist, toggleWishlist }) {
   // State สำหรับตัวกรอง
@@ -63,6 +64,11 @@ export default function Home({ filteredProducts, currentUser, handleAddToCart, w
         <div className="text-muted small fw-bold">
           พบสินค้า {displayProducts.length} รายการ
         </div>
+      </div>
+
+      {/* Promotions Section */}
+      <div style={{ marginBottom: '24px', padding: '0' }}>
+        <PromotionsList />
       </div>
 
       {/* ======================================================= */}

@@ -9,7 +9,7 @@ import Register from './pages/Register';
 import Cart from './pages/Cart';
 import ProductDetail from './pages/ProductDetail';
 import Profile from './pages/Profile';
-import ManageReviews from './pages/ManageReviews'; 
+import ManageReviews from './pages/ManageReviews';
 
 export default function App() {
   const navigate = useNavigate();
@@ -176,8 +176,7 @@ export default function App() {
             orders={orders} handleUpdateOrderStatus={handleUpdateOrderStatus} 
           />
         } />
-        {/* 🆕 เพิ่ม Route สำหรับหน้าจัดการรีวิวของแอดมิน */}
-        <Route path="/admin/reviews" element={<ManageReviews />} /> 
+        <Route path="/admin/reviews" element={<ManageReviews />} />
       </Routes>
     </div>
   );

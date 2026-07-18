@@ -3,6 +3,8 @@ import axios from 'axios';
 
 const ManageReviews = () => {
   const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState(null);
 
   useEffect(() => {
     fetchAdminReviews();
@@ -10,6 +12,7 @@ const ManageReviews = () => {
 
   const fetchAdminReviews = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
       
@@ -18,79 +21,261 @@ const ManageReviews = () => {
     } catch (error) {
       console.error('Error fetching admin reviews', error);
       if (error.response?.status === 403) alert('คุณไม่มีสิทธิ์เข้าถึงหน้านี้ (เฉพาะ Admin)');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (reviewId, newStatus) => {
-    if (!window.confirm(`คุณต้องการ ${newStatus === 'approved' ? 'อนุมัติ' : 'ปฏิเสธ'} รีวิวนี้ใช่หรือไม่?`)) return;
-    
+  const handleDeleteReview = async (reviewId) => {
     try {
       const token = localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      await axios.put(`http://localhost:5000/api/admin/reviews/${reviewId}/status`, { status: newStatus }, config);
-      
-      // อัปเดต State ให้ UI เปลี่ยนทันที
-      setReviews(reviews.map(r => r._id === reviewId ? { ...r, status: newStatus } : r));
+      await axios.delete(`http://localhost:5000/api/admin/reviews/${reviewId}`, config);
+      setReviews(reviews.filter(r => r.id !== reviewId));
+      setDeleteId(null);
     } catch (error) {
       console.error(error);
-      alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+      alert('เกิดข้อผิดพลาดในการลบรีวิว');
     }
   };
 
-  return (
-    <div className="p-6 bg-white rounded-lg shadow-md w-full">
-      <h2 className="text-2xl font-bold mb-6 border-b pb-2">จัดการรีวิว (Manage Reviews)</h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full table-auto border-collapse border border-gray-200">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border p-3 text-left">สินค้า</th>
-              <th className="border p-3 text-left">ลูกค้า</th>
-              <th className="border p-3 text-center">คะแนน</th>
-              <th className="border p-3 text-left w-1/3">คอมเมนต์</th>
-              <th className="border p-3 text-center">สถานะ</th>
-              <th className="border p-3 text-center w-40">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reviews.map((review) => (
-              <tr key={review._id} className="hover:bg-gray-50">
-                <td className="border p-3">{review.productId?.name || 'Unknown Product'}</td>
-                <td className="border p-3">{review.userId?.name || 'Unknown User'}</td>
-                <td className="border p-3 text-center text-yellow-500 font-bold">{'★'.repeat(review.rating)}</td>
-                <td className="border p-3">{review.comment}</td>
-                <td className="border p-3 text-center">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    review.status === 'approved' ? 'bg-green-100 text-green-700' : 
-                    review.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {review.status.toUpperCase()}
-                  </span>
-                </td>
-                <td className="border p-3 text-center space-x-2">
-                  {review.status === 'pending' && (
-                    <div className="flex justify-center space-x-2">
-                      <button 
-                        onClick={() => handleUpdateStatus(review._id, 'approved')}
-                        className="bg-green-500 text-white px-3 py-1 rounded shadow hover:bg-green-600 transition-colors text-sm"
-                      >
-                        ✔ อนุมัติ
-                      </button>
-                      <button 
-                        onClick={() => handleUpdateStatus(review._id, 'rejected')}
-                        className="bg-red-500 text-white px-3 py-1 rounded shadow hover:bg-red-600 transition-colors text-sm"
-                      >
-                        ✖ ปฏิเสธ
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <div style={{ fontSize: '24px', marginBottom: '16px' }}>⏳</div>
+        <p style={{ color: '#64748b', fontWeight: '500' }}>กำลังโหลดข้อมูลรีวิว...</p>
       </div>
+    );
+  }
+
+  return (
+    <div style={{ width: '100%' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '24px' }}>⭐</span>
+          <h2 style={{ fontSize: '24px', fontWeight: '900', margin: 0, letterSpacing: '0.5px' }}>
+            จัดการรีวิวจากลูกค้า
+          </h2>
+        </div>
+        <p style={{ color: '#64748b', margin: '8px 0 0 0', fontSize: '14px' }}>
+          จำนวนรีวิวทั้งหมด: <span style={{ fontWeight: 'bold', color: '#1e293b' }}>{reviews.length}</span> รายการ
+        </p>
+      </div>
+
+      {reviews.length === 0 ? (
+        <div style={{
+          backgroundColor: '#f8fafc',
+          border: '2px dashed #cbd5e1',
+          borderRadius: '12px',
+          padding: '56px 28px',
+          textAlign: 'center'
+        }}>
+          <span style={{ fontSize: '44px', display: 'block', marginBottom: '14px' }}>📝</span>
+          <p style={{ color: '#64748b', fontSize: '15px', margin: 0 }}>ยังไม่มีรีวิวในระบบ</p>
+          <p style={{ color: '#94a3b8', fontSize: '14px', margin: '8px 0 0 0' }}>รีวิวจากลูกค้าจะปรากฏที่นี่เมื่อมีการส่งรีวิว</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '18px' }}>
+          {reviews.map((review) => (
+            <div 
+              key={review.id}
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '18px',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+                e.currentTarget.style.borderColor = '#cbd5e1';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                e.currentTarget.style.borderColor = '#e2e8f0';
+              }}
+            >
+              {/* Header Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px', gap: '16px', marginBottom: '12px' }}>
+                {/* Product Info */}
+                <div>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    สินค้า
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', marginTop: '4px' }}>
+                    {review.product_name || '❓ ไม่ทราบชื่อสินค้า'}
+                  </div>
+                </div>
+
+                {/* User Info */}
+                <div>
+                  <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    ลูกค้า
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', marginTop: '4px' }}>
+                    👤 {review.user_name || 'ลูกค้าไม่ระบุชื่อ'}
+                  </div>
+                </div>
+
+                {/* Rating & Date */}
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '6px', letterSpacing: '1.5px' }}>
+                    {'★'.repeat(review.rating)}<span style={{ color: '#d1d5db' }}>{'★'.repeat(5 - review.rating)}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                    {new Date(review.created_at).toLocaleDateString('th-TH')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Comment Section */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '6px', marginBottom: '12px', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', marginBottom: '6px' }}>ความเห็นของลูกค้า</div>
+                <p style={{ color: '#1e293b', fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
+                  {review.comment}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setDeleteId(review.id)}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#ef4444',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#dc2626';
+                    e.target.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#ef4444';
+                    e.target.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2)';
+                  }}
+                >
+                  🗑️ ลบ
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            border: '1px solid #e2e8f0',
+            padding: '32px',
+            maxWidth: '420px',
+            width: '100%',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.15)',
+            animation: 'slideUp 0.3s ease'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <span style={{ fontSize: '48px', display: 'block', marginBottom: '14px' }}>⚠️</span>
+              <h3 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 12px 0', color: '#1e293b' }}>
+                ยืนยันการลบรีวิว
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '14px', margin: '0', lineHeight: '1.5' }}>
+                คุณแน่ใจที่ต้องการลบรีวิวนี้หรือไม่? การกระทำนี้ไม่สามารถยกเลิกได้
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setDeleteId(null)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  color: '#475569',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#f1f5f9';
+                  e.target.style.borderColor = '#94a3b8';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#ffffff';
+                  e.target.style.borderColor = '#cbd5e1';
+                }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={() => handleDeleteReview(deleteId)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  color: '#ffffff',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 8px rgba(239, 68, 68, 0.2)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#dc2626';
+                  e.target.style.boxShadow = '0 6px 12px rgba(239, 68, 68, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#ef4444';
+                  e.target.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.2)';
+                }}
+              >
+                ลบถาวร
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };

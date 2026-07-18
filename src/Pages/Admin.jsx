@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import ManageReviews from './ManageReviews';
+import ManagePromotions from './ManagePromotions';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -359,6 +361,28 @@ export default function Admin() {
           >
             Orders
           </button>
+          <button 
+            onClick={() => { setActiveTab('reviews'); setSearchTerm(''); }}
+            style={{ 
+              padding: '10px 20px', borderRadius: '8px', border: 'none', 
+              backgroundColor: activeTab === 'reviews' ? '#1e293b' : '#f1f5f9', 
+              color: activeTab === 'reviews' ? '#ffffff' : '#475569', 
+              fontWeight: '700', fontSize: '14px', cursor: 'pointer', transition: 'all 0.15s'
+            }}
+          >
+            Reviews
+          </button>
+          <button 
+            onClick={() => { setActiveTab('promotions'); setSearchTerm(''); }}
+            style={{ 
+              padding: '10px 20px', borderRadius: '8px', border: 'none', 
+              backgroundColor: activeTab === 'promotions' ? '#1e293b' : '#f1f5f9', 
+              color: activeTab === 'promotions' ? '#ffffff' : '#475569', 
+              fontWeight: '700', fontSize: '14px', cursor: 'pointer', transition: 'all 0.15s'
+            }}
+          >
+            Promotions
+          </button>
         </div>
 
         {/* แสดงผลการตอบกลับจากระบบ */}
@@ -622,6 +646,16 @@ export default function Admin() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <ManageReviews />
+        )}
+
+        {/* Promotions Tab */}
+        {activeTab === 'promotions' && (
+          <ManagePromotions />
         )}
 
       </div>
