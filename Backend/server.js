@@ -365,23 +365,73 @@ app.delete('/api/products/:id', authenticateToken, async (req, res) => {
 // 5. API Routes สำหรับระบบสั่งซื้อพัสดุ (Orders)
 // ==========================================
 
-// 1) บันทึกสั่งซื้อใหม่
+// 1) บันทึกสั่งซื้อใหม่ และตัดสต๊อกสินค้า
 app.post('/api/orders', async (req, res) => {
+    // 🌟 ใช้ Transaction เพื่อให้แน่ใจว่าถ้าตัดสต๊อกพลาด ออเดอร์จะไม่ถูกสร้าง (ป้องกันข้อมูลไม่ตรงกัน)
+    const client = await pool.connect(); 
     try {
-        const { customerName, customerEmail, shoeModel, size, totalAmount, paymentMethod } = req.body;
+        await client.query('BEGIN'); // เริ่ม Transaction
+
+        // รับค่า items ที่เราเพิ่งแก้ให้หน้าบ้านส่งมา
+        const { customerName, customerEmail, shoeModel, size, totalAmount, paymentMethod, items } = req.body;
         const newId = 'KZ' + Math.floor(100000 + Math.random() * 900000).toString();
         
-        const query = `
+        // --- ส่วนที่ 1: บันทึกข้อมูลออเดอร์ลงตาราง orders ---
+        const orderQuery = `
             INSERT INTO orders (id, customer_name, customer_email, shoe_model, size, total_amount, payment_method) 
             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
         `;
-        const values = [newId, customerName, customerEmail, shoeModel, size, Number(totalAmount), paymentMethod || 'PromptPay'];
+        const orderValues = [newId, customerName, customerEmail, shoeModel, size, Number(totalAmount), paymentMethod || 'PromptPay'];
+        const { rows } = await client.query(orderQuery, orderValues);
 
-        const { rows } = await pool.query(query, values);
+        // --- ส่วนที่ 2: วนลูปตัดสต๊อกสินค้าในตาราง products ---
+        if (items && items.length > 0) {
+            for (const item of items) {
+                // ดึงข้อมูลสต๊อกปัจจุบันของสินค้านั้น
+                const productRes = await client.query('SELECT stock FROM products WHERE id = $1', [item.productId]);
+                
+                if (productRes.rows.length > 0) {
+                    let currentStock = productRes.rows[0].stock;
+                    
+                    // แปลงกลับเป็น Object ถ้าฐานข้อมูลเก็บเป็น String JSON
+                    if (typeof currentStock === 'string') {
+                        currentStock = JSON.parse(currentStock);
+                    }
+
+                    // ค้นหาไซส์ที่ตรงกัน (หน้าบ้านอาจส่งมา '43' แต่ใน DB อาจเก็บ 'EU 43')
+                    const selectedSize = item.size.toString().trim();
+                    const sizeKey = Object.keys(currentStock).find(key => 
+                        key === selectedSize || 
+                        key === `EU ${selectedSize}` || 
+                        key.includes(selectedSize)
+                    );
+
+                    // ถ้าเจอไซส์นั้น และมีของเหลืออยู่
+                    if (sizeKey && currentStock[sizeKey] !== undefined) {
+                        const qtyToDeduct = item.quantity || 1;
+                        
+                        // ป้องกันไม่ให้สต๊อกติดลบ (อย่างน้อยเป็น 0)
+                        currentStock[sizeKey] = Math.max(0, currentStock[sizeKey] - qtyToDeduct);
+                        
+                        // อัปเดตสต๊อกกลับเข้าไปใน Database
+                        await client.query(
+                            'UPDATE products SET stock = $1 WHERE id = $2', 
+                            [JSON.stringify(currentStock), item.productId]
+                        );
+                    }
+                }
+            }
+        }
+
+        await client.query('COMMIT'); // สิ้นสุดและยืนยันการบันทึกข้อมูล (ออเดอร์ + ตัดสต๊อก)
         res.status(201).json({ success: true, order: mapOrderForFrontend(rows[0]) });
+
     } catch (error) {
+        await client.query('ROLLBACK'); // ❌ ถ้าระหว่างทางมี Error ให้ยกเลิกการทำงานทั้งหมด 
         console.error("Order Insertion Error:", error);
-        res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ: ' + error.message });
+        res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อและตัดสต๊อก: ' + error.message });
+    } finally {
+        client.release(); // คืน Connection ให้ Pool
     }
 });
 

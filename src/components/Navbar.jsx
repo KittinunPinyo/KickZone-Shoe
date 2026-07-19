@@ -49,33 +49,70 @@ export default function Navbar({ searchQuery, setSearchQuery, cart }) {
             {user && user.role === 'customer' && (
               <div className="d-flex align-items-center gap-3">
                 
-                {/* 🛒 ไอคอนตะกร้า (โทนสีเบจ/น้ำตาลตุ่น) */}
+                {/* 🛒 ไอคอนตะกร้า (ปรับดีไซน์ใหม่เป็นแบบทรงแคปซูล คลีนๆ สไตล์มินิมอล) */}
                 <Link 
                   to="/cart" 
-                  className="text-decoration-none position-relative d-flex justify-content-center align-items-center rounded-circle" 
-                  style={{ width: '45px', height: '45px', backgroundColor: '#F0EBE6' }}
+                  className="text-decoration-none border d-flex align-items-center px-3 gap-2 rounded-pill bg-white shadow-sm" 
+                  style={{ height: '45px', borderColor: '#E8E1D9', color: '#5C4E43', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#faf9f7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8C7A6B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
+                  <svg 
+                    width="18" 
+                    height="18" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="1.8" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="9" cy="21" r="1.5"></circle>
+                    <circle cx="20" cy="21" r="1.5"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                   </svg>
                   
+                  <span style={{ fontSize: '14px', fontWeight: '500' }}></span>
+                  
+                  {/* Badge แจ้งเตือนจำนวนสินค้าแบบใหม่ (วงกลมสีดำ เล็กๆ น่ารักๆ ภายในปุ่ม) */}
                   {cart && cart.length > 0 && (
-                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger shadow-sm" style={{ fontSize: '0.65rem' }}>
+                    <span 
+                      className="d-flex justify-content-center align-items-center rounded-circle" 
+                      style={{ 
+                        width: '22px', 
+                        height: '22px', 
+                        backgroundColor: '#111111', 
+                        color: '#ffffff', 
+                        fontSize: '11px', 
+                        fontWeight: '600',
+                        marginLeft: '4px'
+                      }}
+                    >
                       {cart.length}
                     </span>
                   )}
                 </Link>
 
-                {/* 👤 ไอคอนโปรไฟล์ (โทนสีน้ำตาลตุ่น) */}
+                {/* 👤 ไอคอนโปรไฟล์ */}
                 <Link 
                   to="/profile" 
                   className="text-decoration-none border d-flex align-items-center px-3 gap-2 rounded-pill bg-white shadow-sm" 
-                  style={{ height: '45px', borderColor: '#E8E1D9', color: '#5C4E43' }}
+                  style={{ height: '45px', borderColor: '#E8E1D9', color: '#5C4E43', transition: 'all 0.2s' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#faf9f7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="#8C7A6B" stroke="none">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  <svg 
+                    width="18" 
+                    height="18" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="1.8" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
                   </svg>
                   <span style={{ fontSize: '14px', fontWeight: '500' }}>สวัสดี, {user.name}</span>
                 </Link>

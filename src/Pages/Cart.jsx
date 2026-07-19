@@ -7,10 +7,14 @@ export default function Cart() {
   const [cartItems, setCartItems] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('PromptPay'); 
+  
   const [shippingInfo, setShippingInfo] = useState({
     name: '',
     phone: '',
-    address: ''
+    country: 'ไทย',
+    addressDetail: '',
+    subdistrictDistrictProvince: '',
+    postalCode: ''
   });
   
   const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart', 'upload_slip', 'success'
@@ -20,7 +24,6 @@ export default function Cart() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // สถานะตำแหน่งโฟกัสข้อมูล (Focus Status) สำหรับแอนิเมชันของฟิลด์ข้อมูล
   const [focusedField, setFocusedField] = useState(null);
 
   useEffect(() => {
@@ -28,17 +31,14 @@ export default function Cart() {
     if (storedCart) {
       const parsedCart = JSON.parse(storedCart);
       
-      // ตรวจสอบและดึงข้อมูลไซส์รองเท้าจากทุกคีย์ที่เป็นไปได้ แล้วแปลงให้เป็นสเกลมาตรฐานไม่มีคำว่า EU นำหน้า
       const sanitizedCart = parsedCart.map(item => {
         let rawSize = item.size || item.selectedSize || item.shoeSize || item.euSize;
-        
         if (rawSize && typeof rawSize === 'string') {
           rawSize = rawSize.replace(/EU\s*/i, '').trim();
         }
-        
         return {
           ...item,
-          size: rawSize || '42' // หากไม่มีข้อมูลระบบจะจัดสรรไซส์ 42 เป็นค่าพื้นฐานเพื่อความปลอดภัยของโมเดล
+          size: rawSize || '42'
         };
       });
       
@@ -86,26 +86,47 @@ export default function Cart() {
     }
   };
 
+  // ตรวจสอบความถูกต้องของฟอร์ม
+  const isPhoneValid = /^[0-9]{10}$/.test(shippingInfo.phone); 
+  const isFormValid = 
+    shippingInfo.name.trim() !== '' &&
+    isPhoneValid &&
+    shippingInfo.addressDetail.trim() !== '' &&
+    shippingInfo.subdistrictDistrictProvince.trim() !== '' &&
+    shippingInfo.postalCode.trim() !== '';
+
   const handleConfirmOrder = async () => {
     if (cartItems.length === 0) {
       setError('ไม่มีรายการสินค้าในตะกร้าช็อปปิ้งของคุณ');
       return;
     }
-    if (!shippingInfo.name.trim() || !shippingInfo.phone.trim() || !shippingInfo.address.trim()) {
-      setError('กรุณากรอกข้อมูลและรายละเอียดสำหรับการจัดส่งพัสดุให้ครบถ้วนก่อนส่งข้อมูลครับ');
+    if (!isFormValid) {
+      setError('กรุณากรอกข้อมูลที่อยู่จัดส่งและเบอร์โทรศัพท์ (10 หลัก) ให้ครบถ้วนก่อนยืนยันครับ');
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    // ทำการรวมข้อมูลรุ่นและไซส์รองเท้าที่เลือกส่งไปยังฐานข้อมูล NeonDB
+    // สร้าง Array จัดเก็บรายการสินค้าเพื่อส่งไปให้หลังบ้านใช้ตัดสต๊อก
+    const orderItems = cartItems.map(item => ({
+      productId: item.id,            
+      name: item.name,               
+      size: item.size || '42',       
+      quantity: item.quantity || 1,  
+      price: item.price              
+    }));
+
     const shoeModel = cartItems.map(item => `${item.name} (ไซส์ ${item.size || '42'})`).join(', ');
+    const fullAddress = `${shippingInfo.addressDetail}, ${shippingInfo.subdistrictDistrictProvince}, ${shippingInfo.country}, รหัสไปรษณีย์ ${shippingInfo.postalCode}`;
 
     const orderPayload = {
       customerName: shippingInfo.name,
+      customerPhone: shippingInfo.phone,
+      customerAddress: fullAddress,
       customerEmail: currentUser?.email || 'guest@kickzone.com',
       shoeModel: shoeModel,
+      items: orderItems, // ส่งชุดข้อมูลสินค้ารายตัวไปให้ระบบตัดสต๊อก
       size: cartItems[0]?.size || '42',
       totalAmount: totalAmount,
       paymentMethod: paymentMethod
@@ -138,12 +159,10 @@ export default function Cart() {
 
   const handleUploadSlip = async (e) => {
     e.preventDefault();
-    
     if (!slipFile) {
       setError('กรุณาเลือกหรืออัปโหลดรูปภาพใบสลิปสำหรับการโอนเงินจริงก่อนกดยืนยันครับ');
       return;
     }
-
     setLoading(true);
     setError(null);
 
@@ -172,105 +191,96 @@ export default function Cart() {
 
   const inputStyle = (fieldName) => ({
     width: '100%',
-    padding: '16px',
-    border: focusedField === fieldName ? '1px solid #000000' : '1px solid #e5e5e5',
-    borderRadius: '0px',
+    padding: '12px 16px',
+    border: focusedField === fieldName ? '1px solid #5C4E43' : '1px solid #E8E1D9',
+    borderRadius: '8px',
     fontSize: '14px',
     backgroundColor: '#ffffff',
+    color: '#5C4E43',
     outline: 'none',
     boxSizing: 'border-box',
-    transition: 'all 0.15s ease-in-out',
+    transition: 'all 0.2s ease-in-out',
     fontFamily: 'inherit'
   });
 
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#fafafa', minHeight: '100vh', padding: '40px 16px', color: '#000000' }}>
+    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#F8F6F3', minHeight: '100vh', padding: '40px 16px', color: '#5C4E43' }}>
       <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
         
         {/* Luxury Progress Navigation Tab */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '48px', borderBottom: '1px solid #e5e5e5', paddingBottom: '24px', gap: '0px' }}>
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <span style={{ fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', color: checkoutStep === 'cart' ? '#000000' : '#a3a3a3', fontSize: '13px', display: 'block' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '48px', borderBottom: '1px solid #E8E1D9', paddingBottom: '24px', gap: '20px' }}>
+          <div style={{ textAlign: 'center', position: 'relative' }}>
+            <span style={{ fontWeight: '800', color: checkoutStep === 'cart' ? '#5C4E43' : '#B8A99A', fontSize: '15px', display: 'block', paddingBottom: '8px' }}>
               01 / ตะกร้า & ข้อมูลจัดส่ง
             </span>
-            {checkoutStep === 'cart' && <div style={{ height: '2px', backgroundColor: '#000000', width: '60px', margin: '8px auto 0 auto' }} />}
+            {checkoutStep === 'cart' && <div style={{ height: '3px', backgroundColor: '#5C4E43', width: '100%', position: 'absolute', bottom: '-24px', left: 0 }} />}
           </div>
-          <span style={{ color: '#d4d4d4', fontSize: '14px', fontWeight: '300' }}>➔</span>
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <span style={{ fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', color: checkoutStep === 'upload_slip' ? '#000000' : '#a3a3a3', fontSize: '13px', display: 'block' }}>
+          <span style={{ color: '#E8E1D9', fontSize: '18px', paddingBottom: '8px' }}>→</span>
+          <div style={{ textAlign: 'center', position: 'relative' }}>
+            <span style={{ fontWeight: '800', color: checkoutStep === 'upload_slip' ? '#5C4E43' : '#B8A99A', fontSize: '15px', display: 'block', paddingBottom: '8px' }}>
               02 / แนบหลักฐานการโอน
             </span>
-            {checkoutStep === 'upload_slip' && <div style={{ height: '2px', backgroundColor: '#000000', width: '60px', margin: '8px auto 0 auto' }} />}
+            {checkoutStep === 'upload_slip' && <div style={{ height: '3px', backgroundColor: '#5C4E43', width: '100%', position: 'absolute', bottom: '-24px', left: 0 }} />}
           </div>
-          <span style={{ color: '#d4d4d4', fontSize: '14px', fontWeight: '300' }}>➔</span>
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <span style={{ fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', color: checkoutStep === 'success' ? '#000000' : '#a3a3a3', fontSize: '13px', display: 'block' }}>
+          <span style={{ color: '#E8E1D9', fontSize: '18px', paddingBottom: '8px' }}>→</span>
+          <div style={{ textAlign: 'center', position: 'relative' }}>
+            <span style={{ fontWeight: '800', color: checkoutStep === 'success' ? '#5C4E43' : '#B8A99A', fontSize: '15px', display: 'block', paddingBottom: '8px' }}>
               03 / ยืนยันการสั่งซื้อสำเร็จ
             </span>
-            {checkoutStep === 'success' && <div style={{ height: '2px', backgroundColor: '#000000', width: '60px', margin: '8px auto 0 auto' }} />}
+            {checkoutStep === 'success' && <div style={{ height: '3px', backgroundColor: '#5C4E43', width: '100%', position: 'absolute', bottom: '-24px', left: 0 }} />}
           </div>
         </div>
 
         {/* STEP 1: CART LIST & DELIVERY FORM */}
         {checkoutStep === 'cart' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '40px' }} className="grid lg:grid-cols-3">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }} className="grid lg:grid-cols-3">
             
             {/* Left Column: Items list & Delivery forms */}
-            <div className="lg:col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div className="lg:col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
               {/* Product items container */}
-              <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '0px', border: '1px solid #e5e5e5', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
-                <h2 style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', margin: '0 0 24px 0', color: '#000000', borderBottom: '2px solid #000000', paddingBottom: '10px' }}>
+              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E8E1D9' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '800', margin: '0 0 20px 0', color: '#5C4E43', borderBottom: '1px solid #F8F6F3', paddingBottom: '16px' }}>
                   ตะกร้าของคุณ ({cartItems.length} รายการ)
                 </h2>
-
-                {error && (
-                  <div style={{ padding: '16px', backgroundColor: '#000000', color: '#ffffff', borderRadius: '0px', marginBottom: '24px', fontWeight: '600', fontSize: '14px', letterSpacing: '0.5px' }}>
-                    ⚠️ {error}
-                  </div>
-                )}
                 
                 {cartItems.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 0', color: '#737373' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '16px' }}>⬛</div>
-                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: '#000000' }}>ไม่มีสินค้าในตะกร้าช็อปปิ้ง</p>
-                    <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#a3a3a3' }}>กรุณาเลือกโมเดลรองเท้าที่คุณชอบจากหน้าแคตตาล็อกเพื่อเริ่มสั่งซื้อครับ</p>
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: '#8C7A6B' }}>
+                    <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#5C4E43' }}>ไม่มีสินค้าในตะกร้า</p>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {cartItems.map((item) => (
-                      <div key={item.id} style={{ display: 'flex', gap: '24px', borderBottom: '1px solid #f5f5f5', paddingBottom: '20px', alignItems: 'center' }}>
-                        <div style={{ width: '90px', height: '90px', backgroundColor: '#f9f9f9', borderRadius: '0px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e5e5', flexShrink: 0 }}>
-                          <span style={{ fontSize: '32px', filter: 'grayscale(100%)' }}>👟</span>
-                        </div>
+                      <div key={item.id} style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #F8F6F3', paddingBottom: '20px', alignItems: 'center' }}>
                         
+                        {/* ดึงรูปภาพสินค้ามาแสดงแทนไอคอน */}
+                        <div style={{ width: '80px', height: '80px', backgroundColor: '#F8F6F3', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                          {item.imageUrl || item.image ? (
+                            <img 
+                              src={item.imageUrl || item.image} 
+                              alt={item.name} 
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                            />
+                          ) : (
+                            <span style={{ fontSize: '32px' }}>👟</span>
+                          )}
+                        </div>
+
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: '800', color: '#000000', fontSize: '14px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>{item.name}</div>
-                          
-                          {/* กล่องแสดงไซส์แบบล็อกค่าสไตล์หรูหราจากดีไซน์ image_8ccb01.png */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                            <span style={{ fontSize: '11px', color: '#737373', fontWeight: '800', letterSpacing: '1px' }}>ไซส์:</span>
-                            <span style={{ 
-                              fontSize: '12px', 
-                              fontWeight: '950', 
-                              color: '#000000', 
-                              border: '1px solid #000000', 
-                              padding: '4px 14px', 
-                              backgroundColor: '#ffffff',
-                              letterSpacing: '0.5px',
-                              display: 'inline-block'
-                            }}>
-                              {item.size || '42'}
+                          <div style={{ fontWeight: '800', color: '#5C4E43', fontSize: '14px', textTransform: 'uppercase' }}>{item.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                            <span style={{ fontSize: '13px', color: '#8C7A6B' }}>ไซส์:</span>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#5C4E43', border: '1px solid #E8E1D9', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#ffffff' }}>
+                              {item.size || '35.5'}
                             </span>
                           </div>
                         </div>
-
-                        <div style={{ fontWeight: '900', color: '#000000', fontSize: '15px' }}>฿{item.price.toLocaleString()}</div>
+                        <div style={{ fontWeight: '800', color: '#5C4E43', fontSize: '15px' }}>฿{item.price.toLocaleString()}</div>
                         <button 
                           onClick={() => handleRemoveItem(item.id)}
-                          style={{ padding: '8px 16px', border: '1px solid #e5e5e5', backgroundColor: '#ffffff', color: '#000000', borderRadius: '0px', fontSize: '11px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.15s ease' }}
-                          onMouseEnter={(e) => { e.target.style.backgroundColor = '#000000'; e.target.style.color = '#ffffff'; }}
-                          onMouseLeave={(e) => { e.target.style.backgroundColor = '#ffffff'; e.target.style.color = '#000000'; }}
+                          style={{ padding: '6px 12px', border: '1px solid #E8E1D9', backgroundColor: '#ffffff', color: '#8C7A6B', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                          onMouseEnter={(e) => { e.target.style.backgroundColor = '#F8F6F3'; e.target.style.color = '#5C4E43'; }}
+                          onMouseLeave={(e) => { e.target.style.backgroundColor = '#ffffff'; e.target.style.color = '#8C7A6B'; }}
                         >
                           ลบออก
                         </button>
@@ -280,120 +290,201 @@ export default function Cart() {
                 )}
               </div>
 
-              {/* Promotions Section */}
-              {cartItems.length > 0 && (
-                <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '0px', border: '1px solid #e5e5e5', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
-                  <PromotionsList />
-                </div>
-              )}
-
               {/* Delivery destination details */}
-              <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '0px', border: '1px solid #e5e5e5' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', color: '#000000', margin: '0 0 24px 0', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px' }}>
-                  📦 ข้อมูลที่อยู่จัดส่งพัสดุ
+              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E8E1D9' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#5C4E43', margin: '0 0 20px 0', borderBottom: '1px solid #F8F6F3', paddingBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span></span> ข้อมูลที่อยู่จัดส่งพัสดุ
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="grid md:grid-cols-2">
-                    <div>
-                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#404040', marginBottom: '8px' }}>ชื่อ-นามสกุลผู้รับ</label>
-                      <input 
-                        type="text" 
-                        placeholder="ระบุชื่อผู้รับพัสดุจริง" 
-                        value={shippingInfo.name} 
-                        onChange={(e) => setShippingInfo({...shippingInfo, name: e.target.value})}
-                        onFocus={() => setFocusedField('name')}
-                        onBlur={() => setFocusedField(null)}
-                        style={inputStyle('name')}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#404040', marginBottom: '8px' }}>เบอร์โทรศัพท์ติดต่อ</label>
-                      <input 
-                        type="text" 
-                        placeholder="เช่น 089XXXXXXX" 
-                        value={shippingInfo.phone} 
-                        onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
-                        onFocus={() => setFocusedField('phone')}
-                        onBlur={() => setFocusedField(null)}
-                        style={inputStyle('phone')}
-                      />
-                    </div>
-                  </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* ชื่อ */}
                   <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#404040', marginBottom: '8px' }}>ที่อยู่จัดส่งโดยละเอียด</label>
-                    <textarea 
-                      rows="3"
-                      placeholder="บ้านเลขที่, ถนน, ตำบล/แขวง, อำเภอ, จังหวัด, รหัสไปรษณีย์" 
-                      value={shippingInfo.address} 
-                      onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
-                      onFocus={() => setFocusedField('address')}
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>ชื่อ</label>
+                    <input 
+                      type="text" 
+                      placeholder="ชื่อ-นามสกุล" 
+                      value={shippingInfo.name} 
+                      onChange={(e) => setShippingInfo({...shippingInfo, name: e.target.value})}
+                      onFocus={() => setFocusedField('name')}
                       onBlur={() => setFocusedField(null)}
-                      style={{ ...inputStyle('address'), resize: 'none' }}
+                      style={inputStyle('name')}
                     />
                   </div>
+
+                  {/* เบอร์โทรศัพท์ - Custom Input */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>เบอร์โทรศัพท์</label>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      border: focusedField === 'phone' ? '1px solid #5C4E43' : '1px solid #E8E1D9',
+                      borderRadius: '8px',
+                      backgroundColor: '#ffffff',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s ease-in-out'
+                    }}>
+                      
+                      <input 
+                        type="text" 
+                        maxLength="10"
+                        placeholder="เบอร์โทรศัพท์" 
+                        value={shippingInfo.phone} 
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, ''); 
+                          setShippingInfo({...shippingInfo, phone: val});
+                        }}
+                        onFocus={() => setFocusedField('phone')}
+                        onBlur={() => setFocusedField(null)}
+                        style={{ flex: 1, padding: '12px 16px', border: 'none', outline: 'none', fontSize: '14px', color: '#5C4E43', backgroundColor: 'transparent', fontFamily: 'inherit' }}
+                      />
+
+                      {/* Clear Button (X) */}
+                      {shippingInfo.phone.length > 0 && (
+                        <button 
+                          onClick={() => setShippingInfo({...shippingInfo, phone: ''})}
+                          style={{ background: 'none', border: 'none', padding: '0 16px', cursor: 'pointer', color: '#8C7A6B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        </button>
+                      )}
+                    </div>
+                    {/* แจ้งเตือนเมื่อเบอร์โทรไม่ครบ */}
+                    {shippingInfo.phone.length > 0 && !isPhoneValid && (
+                      <span style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px', display: 'block' }}>* กรุณากรอกเบอร์โทรศัพท์ให้ครบ 10 หลัก</span>
+                    )}
+                  </div>
+
+                  {/* ประเทศ */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>ประเทศ</label>
+                    <select
+                      value={shippingInfo.country}
+                      onChange={(e) => setShippingInfo({...shippingInfo, country: e.target.value})}
+                      onFocus={() => setFocusedField('country')}
+                      onBlur={() => setFocusedField(null)}
+                      style={{...inputStyle('country'), appearance: 'none', backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%238C7A6B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 16px top 50%', backgroundSize: '10px auto'}}
+                    >
+                      <option value="ไทย">ไทย</option>
+                      <option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                  </div>
+
+                  {/* รายละเอียดที่อยู่ */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>รายละเอียดที่อยู่</label>
+                    <input 
+                      type="text" 
+                      placeholder="รายละเอียดที่อยู่" 
+                      value={shippingInfo.addressDetail} 
+                      onChange={(e) => setShippingInfo({...shippingInfo, addressDetail: e.target.value})}
+                      onFocus={() => setFocusedField('addressDetail')}
+                      onBlur={() => setFocusedField(null)}
+                      style={inputStyle('addressDetail')}
+                    />
+                  </div>
+
+                  {/* จังหวัด, เขต/อำเภอ, แขวง/ตำบล */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>จังหวัด, เขต/อำเภอ, แขวง/ตำบล</label>
+                    <input 
+                      type="text" 
+                      placeholder="จังหวัด, เขต/อำเภอ, แขวง/ตำบล" 
+                      value={shippingInfo.subdistrictDistrictProvince} 
+                      onChange={(e) => setShippingInfo({...shippingInfo, subdistrictDistrictProvince: e.target.value})}
+                      onFocus={() => setFocusedField('subdistrictDistrictProvince')}
+                      onBlur={() => setFocusedField(null)}
+                      style={inputStyle('subdistrictDistrictProvince')}
+                    />
+                  </div>
+
+                  {/* รหัสไปรษณีย์ */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>รหัสไปรษณีย์</label>
+                    <input 
+                      type="text" 
+                      placeholder="รหัสไปรษณีย์" 
+                      value={shippingInfo.postalCode} 
+                      onChange={(e) => setShippingInfo({...shippingInfo, postalCode: e.target.value})}
+                      onFocus={() => setFocusedField('postalCode')}
+                      onBlur={() => setFocusedField(null)}
+                      style={inputStyle('postalCode')}
+                    />
+                  </div>
+
                 </div>
               </div>
 
               {/* Secure Payment methods */}
-              <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '0px', border: '1px solid #e5e5e5' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', color: '#000000', margin: '0 0 24px 0', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px' }}>
-                  💳 ช่องทางการชำระเงินที่ปลอดภัย
+              <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E8E1D9' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#5C4E43', margin: '0 0 20px 0', borderBottom: '1px solid #F8F6F3', paddingBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span></span> ช่องทางการชำระเงิน
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', border: paymentMethod === 'PromptPay' ? '2px solid #000000' : '1px solid #e5e5e5', backgroundColor: paymentMethod === 'PromptPay' ? '#fafafa' : '#ffffff', borderRadius: '0px', cursor: 'pointer', transition: 'all 0.15s ease' }}>
-                    <input type="radio" checked={paymentMethod === 'PromptPay'} onChange={() => setPaymentMethod('PromptPay')} style={{ accentColor: '#000000', width: '16px', height: '16px' }} />
-                    <span style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: '#000000' }}>
-                      📱 สแกน QR CODE (พร้อมเพย์)
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '12px', 
+                    padding: '16px', 
+                    border: paymentMethod === 'PromptPay' ? '2px solid #5C4E43' : '1px solid #E8E1D9', 
+                    backgroundColor: paymentMethod === 'PromptPay' ? '#F8F6F3' : '#ffffff', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer', 
+                    transition: 'all 0.2s ease' 
+                  }}>
+                    <input type="radio" checked={paymentMethod === 'PromptPay'} onChange={() => setPaymentMethod('PromptPay')} style={{ accentColor: '#5C4E43', width: '16px', height: '16px' }} />
+                    <span style={{ fontSize: '14px', fontWeight: '700', color: '#5C4E43' }}>
+                       QR CODE (พร้อมเพย์)
                     </span>
                   </label>
-
                 </div>
               </div>
 
             </div>
 
             {/* Right Column: Order Pricing Summary */}
-            <div style={{ backgroundColor: 'white', padding: '32px', borderRadius: '0px', border: '1px solid #e5e5e5', height: 'fit-content', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '2px', textTransform: 'uppercase', color: '#000000', margin: '0 0 24px 0', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px' }}>
+            <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', border: '1px solid #E8E1D9', height: 'fit-content' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#5C4E43', margin: '0 0 24px 0', borderBottom: '1px solid #F8F6F3', paddingBottom: '16px' }}>
                 สรุปรายการสั่งซื้อ
               </h3>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#737373', fontSize: '14px', letterSpacing: '0.5px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8C7A6B', fontSize: '14px' }}>
                   <span>ยอดรวมสินค้า</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>฿{subTotal.toLocaleString()}</span>
+                  <span style={{ fontWeight: '800', color: '#5C4E43' }}>฿{subTotal.toLocaleString()}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#737373', fontSize: '14px', letterSpacing: '0.5px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8C7A6B', fontSize: '14px' }}>
                   <span>ค่าจัดส่งพัสดุ</span>
-                  <span style={{ fontWeight: '700', color: '#000000' }}>฿{shippingFee.toLocaleString()}</span>
+                  <span style={{ fontWeight: '800', color: '#5C4E43' }}>฿{shippingFee.toLocaleString()}</span>
                 </div>
-                <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '900', letterSpacing: '1px', textTransform: 'uppercase', color: '#000000' }}>ยอดชำระสุทธิ</span>
-                  <span style={{ fontSize: '24px', fontWeight: '950', color: '#000000', letterSpacing: '-0.5px' }}>฿{totalAmount.toLocaleString()}</span>
+                <div style={{ borderTop: '1px dashed #E8E1D9', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: '#5C4E43' }}>ยอดชำระสุทธิ</span>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: '#5C4E43' }}>฿{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
 
+              {error && checkoutStep === 'cart' && (
+                  <div style={{ padding: '12px', backgroundColor: '#FEF2F2', color: '#DC2626', borderRadius: '8px', marginBottom: '16px', fontSize: '12px', border: '1px solid #FCA5A5' }}>
+                    ⚠️ {error}
+                  </div>
+              )}
+
               <button 
                 onClick={handleConfirmOrder}
-                disabled={loading || cartItems.length === 0}
+                disabled={loading || cartItems.length === 0 || !isFormValid}
                 style={{ 
                   width: '100%', 
-                  padding: '18px', 
-                  backgroundColor: (loading || cartItems.length === 0) ? '#a3a3a3' : '#000000', 
+                  padding: '16px', 
+                  backgroundColor: (loading || cartItems.length === 0 || !isFormValid) ? '#D3C9C1' : '#5C4E43', 
                   color: 'white', 
                   border: 'none', 
-                  borderRadius: '0px', 
-                  fontSize: '13px', 
-                  fontWeight: '800', 
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase',
-                  cursor: (loading || cartItems.length === 0) ? 'not-allowed' : 'pointer',
+                  borderRadius: '8px', 
+                  fontSize: '15px', 
+                  fontWeight: '700', 
+                  cursor: (loading || cartItems.length === 0 || !isFormValid) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }}
-                onMouseEnter={(e) => { if (!loading && cartItems.length > 0) e.target.style.backgroundColor = '#1a1a1a'; }}
-                onMouseLeave={(e) => { if (!loading && cartItems.length > 0) e.target.style.backgroundColor = '#000000'; }}
+                onMouseEnter={(e) => { if (!loading && cartItems.length > 0 && isFormValid) e.target.style.backgroundColor = '#4A3E35'; }}
+                onMouseLeave={(e) => { if (!loading && cartItems.length > 0 && isFormValid) e.target.style.backgroundColor = '#5C4E43'; }}
               >
                 {loading ? 'กำลังส่งข้อมูล...' : 'ยืนยันการสั่งซื้อ'}
               </button>
@@ -404,43 +495,40 @@ export default function Cart() {
 
         {/* STEP 2: VERIFY TRANSACTION AND UPLOAD SLIP */}
         {checkoutStep === 'upload_slip' && createdOrder && (
-          <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', padding: '40px', borderRadius: '0px', border: '1px solid #e5e5e5', boxShadow: '0 10px 30px rgba(0,0,0,0.02)' }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', padding: '40px', borderRadius: '12px', border: '1px solid #E8E1D9' }}>
             
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <span style={{ fontSize: '40px', filter: 'grayscale(100%)' }}>🏦</span>
-              <h2 style={{ fontSize: '20px', fontWeight: '900', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#000000', marginTop: '12px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '40px' }}>🏦</span>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#5C4E43', marginTop: '12px', marginBottom: '8px' }}>
                 แนบสลิปเพื่อตรวจสอบข้อมูล
               </h2>
-              <p style={{ color: '#737373', fontSize: '13px', margin: 0 }}>รหัสคำสั่งซื้ออ้างอิง: <strong style={{ color: '#000000' }}>{createdOrder.id}</strong></p>
+              <p style={{ color: '#8C7A6B', fontSize: '14px', margin: 0 }}>รหัสคำสั่งซื้ออ้างอิง: <strong style={{ color: '#5C4E43' }}>{createdOrder.id}</strong></p>
             </div>
 
-            {/* ส่วนแสดงยอดชำระและรูปภาพ QR.png จากโฟลเดอร์ public */}
-            <div style={{ backgroundColor: '#fafafa', border: '1px solid #e5e5e5', padding: '30px 20px', textAlign: 'center', marginBottom: '24px' }}>
-              <span style={{ fontSize: '11px', color: '#737373', display: 'block', marginBottom: '6px', letterSpacing: '1px', textTransform: 'uppercase' }}>ยอดเงินสุทธิที่ต้องโอน</span>
-              <span style={{ fontSize: '32px', fontWeight: '950', color: '#000000', display: 'block', marginBottom: '20px' }}>฿{createdOrder.totalAmount.toLocaleString()}</span>
+            <div style={{ backgroundColor: '#F8F6F3', borderRadius: '12px', padding: '30px 20px', textAlign: 'center', marginBottom: '24px' }}>
+              <span style={{ fontSize: '12px', color: '#8C7A6B', display: 'block', marginBottom: '6px', fontWeight: '600' }}>ยอดเงินสุทธิที่ต้องโอน</span>
+              <span style={{ fontSize: '32px', fontWeight: '800', color: '#5C4E43', display: 'block', marginBottom: '20px' }}>฿{createdOrder.totalAmount.toLocaleString()}</span>
               
-              <div style={{ width: '220px', height: '220px', backgroundColor: 'white', border: '1px solid #e5e5e5', padding: '8px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <div style={{ width: '220px', height: '220px', backgroundColor: 'white', borderRadius: '8px', padding: '12px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: '0 4px 12px rgba(92, 78, 67, 0.05)' }}>
                 <img 
                   src="/QR.png" 
                   alt="PromptPay QR Code" 
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                  onError={(e) => {
-                    e.target.src = 'QR.png';
-                  }}
+                  onError={(e) => { e.target.src = 'QR.png'; }}
                 />
               </div>
             </div>
 
             {error && (
-              <div style={{ padding: '16px', backgroundColor: '#000000', color: '#ffffff', borderRadius: '0px', marginBottom: '24px', fontWeight: '600', fontSize: '13px' }}>
+              <div style={{ padding: '16px', backgroundColor: '#5C4E43', color: '#ffffff', borderRadius: '8px', marginBottom: '24px', fontWeight: '600', fontSize: '14px' }}>
                 ⚠️ {error}
               </div>
             )}
 
             <form onSubmit={handleUploadSlip} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: '#404040', marginBottom: '8px' }}>แนบหลักฐานภาพสลิปโอนเงินจริง (PNG, JPG, JPEG)</label>
-                <div style={{ position: 'relative', border: '1px dashed #cbd5e1', borderRadius: '0px', padding: '24px', textAlign: 'center', backgroundColor: '#fafafa', cursor: 'pointer' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#5C4E43', marginBottom: '8px' }}>แนบหลักฐานภาพสลิปโอนเงินจริง (PNG, JPG, JPEG)</label>
+                <div style={{ position: 'relative', border: '2px dashed #E8E1D9', borderRadius: '12px', padding: '32px 24px', textAlign: 'center', backgroundColor: '#F8F6F3', cursor: 'pointer', transition: 'all 0.2s ease' }}>
                   <input 
                     type="file" 
                     accept="image/png, image/jpeg, image/jpg" 
@@ -448,15 +536,15 @@ export default function Cart() {
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                   />
                   {slipPreview ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                      <img src={slipPreview} alt="Slip Preview" style={{ maxHeight: '200px', objectFit: 'contain', border: '1px solid #cbd5e1' }} />
-                      <span style={{ fontSize: '12px', color: '#000000', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>🔄 กดเพื่อเปลี่ยนภาพสลิปใบใหม่</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                      <img src={slipPreview} alt="Slip Preview" style={{ maxHeight: '200px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #E8E1D9' }} />
+                      <span style={{ fontSize: '13px', color: '#5C4E43', fontWeight: '700' }}>🔄 กดเพื่อเปลี่ยนภาพสลิปใบใหม่</span>
                     </div>
                   ) : (
                     <div>
-                      <span style={{ fontSize: '28px', display: 'block', marginBottom: '8px' }}>📸</span>
-                      <span style={{ fontSize: '13px', fontWeight: '800', color: '#000000', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>เลือกไฟล์รูปภาพใบสลิป</span>
-                      <span style={{ fontSize: '11px', color: '#737373', display: 'block', marginTop: '4px' }}>ขนาดไฟล์รองรับไม่เกิน 5MB</span>
+                      <span style={{ fontSize: '32px', display: 'block', marginBottom: '12px', opacity: 0.7 }}>📸</span>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#5C4E43', display: 'block' }}>คลิกเพื่อเลือกไฟล์รูปภาพใบสลิป</span>
+                      <span style={{ fontSize: '12px', color: '#8C7A6B', display: 'block', marginTop: '6px' }}>ขนาดไฟล์รองรับไม่เกิน 5MB</span>
                     </div>
                   )}
                 </div>
@@ -466,7 +554,9 @@ export default function Cart() {
                 <button 
                   type="button"
                   onClick={() => setCheckoutStep('cart')}
-                  style={{ flex: 1, padding: '16px', border: '1px solid #cbd5e1', backgroundColor: 'white', color: '#000000', borderRadius: '0px', fontSize: '13px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '16px', border: '1px solid #E8E1D9', backgroundColor: 'white', color: '#8C7A6B', borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                  onMouseEnter={(e) => { e.target.style.backgroundColor = '#F8F6F3'; e.target.style.color = '#5C4E43'; }}
+                  onMouseLeave={(e) => { e.target.style.backgroundColor = 'white'; e.target.style.color = '#8C7A6B'; }}
                 >
                   ย้อนกลับ
                 </button>
@@ -476,16 +566,17 @@ export default function Cart() {
                   style={{ 
                     flex: 2, 
                     padding: '16px', 
-                    backgroundColor: loading ? '#cbd5e1' : '#000000', 
+                    backgroundColor: loading ? '#D3C9C1' : '#5C4E43', 
                     color: 'white', 
                     border: 'none', 
-                    borderRadius: '0px', 
-                    fontSize: '13px', 
-                    fontWeight: '800', 
-                    letterSpacing: '1.5px',
-                    textTransform: 'uppercase',
-                    cursor: loading ? 'not-allowed' : 'pointer' 
+                    borderRadius: '8px', 
+                    fontSize: '14px', 
+                    fontWeight: '700', 
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
                   }}
+                  onMouseEnter={(e) => { if (!loading) e.target.style.backgroundColor = '#4A3E35'; }}
+                  onMouseLeave={(e) => { if (!loading) e.target.style.backgroundColor = '#5C4E43'; }}
                 >
                   {loading ? 'กำลังตรวจสอบสลิป...' : 'ส่งสลิปเพื่อตรวจสอบ'}
                 </button>
@@ -496,25 +587,27 @@ export default function Cart() {
 
         {/* STEP 3: ORDER PLACED SUCCESSFULLY */}
         {checkoutStep === 'success' && createdOrder && (
-          <div style={{ maxWidth: '550px', margin: '40px auto 0 auto', backgroundColor: 'white', padding: '48px 32px', borderRadius: '0px', border: '1px solid #e5e5e5', textAlign: 'center' }}>
-            <div style={{ width: '80px', height: '80px', backgroundColor: '#000000', color: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
+          <div style={{ maxWidth: '550px', margin: '40px auto 0 auto', backgroundColor: 'white', padding: '48px 32px', borderRadius: '12px', border: '1px solid #E8E1D9', textAlign: 'center' }}>
+            <div style={{ width: '80px', height: '80px', backgroundColor: '#5C4E43', color: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
               <span style={{ fontSize: '36px' }}>✓</span>
             </div>
 
-            <h2 style={{ fontSize: '22px', fontWeight: '950', color: '#000000', margin: '0 0 12px 0', letterSpacing: '1px', textTransform: 'uppercase' }}>สั่งซื้อพัสดุสำเร็จ</h2>
-            <p style={{ color: '#737373', fontSize: '14px', margin: '0 0 32px 0', lineHeight: '1.6' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#5C4E43', margin: '0 0 12px 0' }}>สั่งซื้อพัสดุสำเร็จ</h2>
+            <p style={{ color: '#8C7A6B', fontSize: '14px', margin: '0 0 32px 0', lineHeight: '1.6' }}>
               รายการชำระเงินและออเดอร์ได้รับการบันทึกแล้ว ทางทีมงาน KickZone กำลังทำการแพ็คพัสดุเตรียมจัดส่งให้คุณอย่างเร็วที่สุดครับ
             </p>
 
-            <div style={{ backgroundColor: '#fafafa', border: '1px solid #000000', padding: '24px', borderRadius: '0px', marginBottom: '32px' }}>
-              <span style={{ fontSize: '11px', color: '#737373', display: 'block', marginBottom: '6px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase' }}>รหัสตรวจสอบสถานะจัดส่งพัสดุ</span>
-              <span style={{ fontSize: '28px', fontWeight: '950', color: '#000000', letterSpacing: '3px', display: 'block' }}>{createdOrder.id}</span>
-              <span style={{ fontSize: '11px', color: '#a3a3a3', display: 'block', marginTop: '8px' }}>* โปรดบันทึกรหัสนี้ไว้เพื่อเช็คสถานะพัสดุของคุณที่หน้าหลัก</span>
+            <div style={{ backgroundColor: '#F8F6F3', border: '1px dashed #E8E1D9', padding: '24px', borderRadius: '8px', marginBottom: '32px' }}>
+              <span style={{ fontSize: '12px', color: '#8C7A6B', display: 'block', marginBottom: '6px', fontWeight: '700' }}>รหัสตรวจสอบสถานะจัดส่งพัสดุ</span>
+              <span style={{ fontSize: '28px', fontWeight: '800', color: '#5C4E43', letterSpacing: '2px', display: 'block' }}>{createdOrder.id}</span>
+              <span style={{ fontSize: '12px', color: '#8C7A6B', display: 'block', marginTop: '12px' }}>* โปรดบันทึกรหัสนี้ไว้เพื่อเช็คสถานะพัสดุของคุณที่หน้าหลัก</span>
             </div>
 
             <button 
               onClick={() => window.location.href = '/'}
-              style={{ padding: '16px 32px', backgroundColor: '#000000', color: 'white', border: 'none', borderRadius: '0px', fontSize: '13px', fontWeight: '800', letterSpacing: '2px', textTransform: 'uppercase', cursor: 'pointer' }}
+              style={{ padding: '16px 32px', backgroundColor: '#5C4E43', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              onMouseEnter={(e) => { e.target.style.backgroundColor = '#4A3E35'; }}
+              onMouseLeave={(e) => { e.target.style.backgroundColor = '#5C4E43'; }}
             >
               กลับไปช้อปต่อหน้าร้านค้า
             </button>

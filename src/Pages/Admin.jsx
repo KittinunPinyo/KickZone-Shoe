@@ -221,7 +221,7 @@ export default function Admin() {
         
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <span style={{ fontSize: '24px' }}>⚙️</span>
+          <span style={{ fontSize: '24px' }}></span>
           <h1 style={{ fontSize: '26px', fontWeight: '900', margin: 0, letterSpacing: '0.5px', color: '#5C4E43' }}>Admin Panel</h1>
         </div>
 
@@ -243,7 +243,7 @@ export default function Admin() {
         {/* Search */}
         {activeTab !== 'dashboard' && (
           <div style={{ marginBottom: '24px' }}>
-            <input type="text" placeholder={activeTab === 'products' ? "🔍 ค้นหารหัส, ชื่อ, แบรนด์..." : "🔍 ค้นหาตามเลขออเดอร์ หรืออีเมล..."} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', maxWidth: '400px', padding: '12px 20px', border: '1px solid #E8E1D9', borderRadius: '50px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }} />
+            <input type="text" placeholder={activeTab === 'products' ? " ค้นหารหัส, ชื่อ, แบรนด์..." : " ค้นหาตามเลขออเดอร์ หรืออีเมล..."} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', maxWidth: '400px', padding: '12px 20px', border: '1px solid #E8E1D9', borderRadius: '50px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }} />
           </div>
         )}
 
@@ -266,7 +266,7 @@ export default function Admin() {
             <div onClick={() => productModal.isOpen && productModal.mode === 'add' ? setProductModal({ ...productModal, isOpen: false }) : openAddProductModal()} 
                  style={{ backgroundColor: '#ffffff', border: '1px solid #E8E1D9', borderRadius: '16px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: productModal.isOpen && productModal.mode === 'add' ? '16px' : '32px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '18px' }}>📦</span><span style={{ color: '#8C7A6B', fontWeight: 'bold', fontSize: '15px' }}>เพิ่มสินค้าใหม่</span>
+                <span style={{ fontSize: '18px' }}></span><span style={{ color: '#8C7A6B', fontWeight: 'bold', fontSize: '15px' }}>เพิ่มสินค้าใหม่</span>
               </div>
               <span style={{ color: '#8C7A6B' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

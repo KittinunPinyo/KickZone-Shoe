@@ -3,47 +3,29 @@ import { Link } from 'react-router-dom';
 
 const API_URL = 'http://localhost:5000/api';
 
-/* STREAMING_CHUNK: Defining delivery step logic from database statuses... */
-// ฟังก์ชันวิเคราะห์สถานะเพื่อขยับ Stepper เพียงจุดเดียวแบบอัจฉริยะ
+// วิเคราะห์สถานะเพื่อขยับ Stepper 
 const getDeliveryStep = (paymentStatus, orderStatus) => {
   const payNorm = (paymentStatus || '').trim().toUpperCase();
   const orderNorm = (orderStatus || '').trim().toUpperCase();
 
-  // 1. ยังไม่ได้สแกนสลิปจริง หรือรอตรวจสอบ -> สเต็ป 0 (ได้รับออเดอร์แล้ว/รอชำระเงิน)
-  if (payNorm === 'PENDING UPLOAD' || payNorm === 'รอชำระเงิน' || payNorm === 'PENDING VERIFICATION' || payNorm === 'รอตรวจสอบสลิป') {
-    return 0; 
-  }
-  // 2. ชำระเงินผ่านแล้ว และอยู่ในขั้นเตรียมแพ็คของ -> สเต็ป 1 (กำลังจัดเตรียมพัสดุ)
-  if (orderNorm === 'PROCESSING' || orderNorm === 'เตรียมจัดส่ง') {
-    return 1;
-  }
-  // 3. แนบเลขแทร็กและนำส่งขนส่งแล้ว -> สเต็ป 2 (ส่งพัสดุแล้ว)
-  if (orderNorm === 'SHIPPED' || orderNorm === 'จัดส่งแล้ว') {
-    return 2;
-  }
-  // 4. พัสดุถึงมือลูกค้าสำเร็จเสร็จสิ้น -> สเต็ป 3 (สำเร็จเรียบร้อย)
-  if (orderNorm === 'DELIVERED' || orderNorm === 'สำเร็จ') {
-    return 3;
-  }
+  if (payNorm === 'PENDING UPLOAD' || payNorm === 'รอชำระเงิน' || payNorm === 'PENDING VERIFICATION' || payNorm === 'รอตรวจสอบสลิป') return 0; 
+  if (orderNorm === 'PROCESSING' || orderNorm === 'เตรียมจัดส่ง') return 1;
+  if (orderNorm === 'SHIPPED' || orderNorm === 'จัดส่งแล้ว') return 2;
+  if (orderNorm === 'DELIVERED' || orderNorm === 'สำเร็จ') return 3;
   return 0;
 };
 
-/* STREAMING_CHUNK: Helper text function based on combined status... */
-// ฟังก์ชันส่งคืนข้อความบรรยายสั้น ๆ ใต้รหัสสั่งซื้อ เพื่ออธิบายสเต็ปปัจจุบันให้เข้าใจง่าย
+// ข้อความอธิบายสถานะย่อย
 const getStatusDescriptionText = (paymentStatus, orderStatus) => {
   const payNorm = (paymentStatus || '').trim().toUpperCase();
   const orderNorm = (orderStatus || '').trim().toUpperCase();
 
-  if (payNorm === 'PENDING UPLOAD' || payNorm === 'รอชำระเงิน') {
-    return '⏳ รอการชำระเงินจากคุณ';
-  }
-  if (payNorm === 'PENDING VERIFICATION' || payNorm === 'รอตรวจสอบสลิป') {
-    return '🕒 อยู่ระหว่างการตรวจสอบรูปภาพสลิปโอนเงิน';
-  }
+  if (payNorm === 'PENDING UPLOAD' || payNorm === 'รอชำระเงิน') return '⏳ รอการชำระเงินจากคุณ';
+  if (payNorm === 'PENDING VERIFICATION' || payNorm === 'รอตรวจสอบสลิป') return '🕒 อยู่ระหว่างการตรวจสอบสลิปโอนเงิน';
   if (payNorm === 'PAID' || payNorm === 'ชำระเงินสำเร็จ') {
     if (orderNorm === 'SHIPPED' || orderNorm === 'จัดส่งแล้ว') return '🚚 พัสดุถูกจัดส่งออกเรียบร้อยแล้ว';
     if (orderNorm === 'DELIVERED' || orderNorm === 'สำเร็จ') return '🏠 รายการสั่งซื้อเสร็จสมบูรณ์เรียบร้อย';
-    return '📦 ชำระเงินสำเร็จแล้ว • อยู่ระหว่างการแพ็คเตรียมจัดส่ง';
+    return '📦 ชำระเงินสำเร็จแล้ว • อยู่ระหว่างเตรียมจัดส่ง';
   }
   return '📝 ได้รับรายการสั่งซื้อเข้าสู่ระบบ';
 };
@@ -51,25 +33,43 @@ const getStatusDescriptionText = (paymentStatus, orderStatus) => {
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [wishlist, setWishlist] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('profile'); 
 
-  /* STREAMING_CHUNK: Fetching current logged user configuration... */
+  // 🎨 อัปเดตธีมสีให้ตรงกับ Navbar โทน Warm Minimal
+  const theme = {
+    bg: '#ffffff',
+    contentBg: '#F9F8F6', // พื้นหลังกล่องเนื้อหาด้านขวา (เบจอ่อนมาก)
+    primary: '#8C7A6B',   // น้ำตาลตุ่น (ปุ่ม, Stepper, Icon Active)
+    textDark: '#4A3F35',  // น้ำตาลเข้มสำหรับตัวหนังสือหลัก
+    textMuted: '#9E9185', // สีเทาอมน้ำตาลสำหรับข้อความรอง
+    border: '#E8E1D9',    // สีเส้นขอบ
+    activeBg: '#F8F6F3'   // สีพื้นหลังตอน Hover หรือ Active เมนูซ้าย
+  };
+
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
     } else {
-      // ดึงโปรไฟล์ลูกค้าตัวอย่างเพื่อความเสถียรตรงตามภาพอ้างอิง image_8dbfbc.png
       const mockUser = {
-        name: 'ธนวิศิษฐ์ อินต๊ะแสน',
-        email: 'uro4544@gmail.com'
+        name: 'Mr. THANAWISIT INTASAN',
+        email: 'thanawisit.int@spumail.net'
       };
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
     }
+
+    const savedWishlist = localStorage.getItem('wishlist');
+    if (savedWishlist) {
+      setWishlist(JSON.parse(savedWishlist));
+    } else {
+      const mockWishlist = [];
+      setWishlist(mockWishlist);
+    }
   }, []);
 
-  /* STREAMING_CHUNK: Realtime sync database query with API Polling... */
   const fetchOrdersFromDatabase = async () => {
     if (!user?.email) return;
     try {
@@ -85,7 +85,6 @@ export default function Profile() {
     }
   };
 
-  // ดึงประวัติสั่งซื้อทุก ๆ 3 วินาที เพื่อรีเฟรชข้อมูลตามหน้าจอแอดมินโดยตรงแบบเรียลไทม์
   useEffect(() => {
     if (user?.email) {
       fetchOrdersFromDatabase();
@@ -96,259 +95,262 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#737373' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', fontFamily: "'Kanit', 'Prompt', sans-serif", color: theme.textMuted }}>
         กำลังดึงข้อมูลบัญชีผู้ใช้...
       </div>
     );
   }
 
-  // ครองเฉพาะออเดอร์จริงของอีเมลลูกค้ารายนี้
   const myOrders = orders.filter(o => 
     (o.customer_email || o.customerEmail || '').trim().toLowerCase() === user.email.trim().toLowerCase()
   );
 
+  const SidebarItem = ({ id, icon, title, subtitle }) => {
+    const isActive = activeTab === id;
+    return (
+      <div 
+        onClick={() => setActiveTab(id)}
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          padding: '12px 16px', 
+          borderRadius: '12px',
+          backgroundColor: isActive ? theme.activeBg : 'transparent',
+          cursor: 'pointer',
+          transition: 'background-color 0.2s',
+          marginBottom: '8px'
+        }}
+        onMouseEnter={(e) => !isActive && (e.currentTarget.style.backgroundColor = theme.activeBg)}
+        onMouseLeave={(e) => !isActive && (e.currentTarget.style.backgroundColor = 'transparent')}
+      >
+        <span style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          width: '24px', 
+          marginRight: '16px', 
+          color: isActive ? theme.primary : '#B8B0A8',
+          transition: 'color 0.2s'
+        }}>
+          {icon}
+        </span>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: isActive ? '600' : '500', color: isActive ? theme.textDark : '#6C5E53' }}>{title}</div>
+          <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{subtitle}</div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif', backgroundColor: '#fafafa', minHeight: '100vh', padding: '40px 16px', color: '#000000' }}>
-      <div style={{ maxWidth: '1160px', margin: '0 auto' }}>
+    <div style={{ fontFamily: "'Kanit', 'Prompt', sans-serif", backgroundColor: theme.bg, minHeight: '100vh', padding: '40px 0', color: theme.textDark }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', gap: '48px', padding: '0 24px' }}>
         
-        {/* บัญชีของฉัน */}
-        <h2 style={{ fontSize: '22px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '32px', letterSpacing: '0.5px' }}>
-          <span style={{ fontSize: '24px' }}></span> บัญชีของฉัน
-        </h2>
-
-        {/* กริดแบ่งฝั่ง ข้อมูลโปรไฟล์ และ ประวัติสั่งซื้อ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }} className="grid lg:grid-cols-3">
+        {/* คอลัมน์ซ้าย: Sidebar Navigation */}
+        <div style={{ width: '280px', flexShrink: 0 }}>
           
-          {/* ซ้าย: ข้อมูลส่วนตัวลูกค้า */}
-          <div>
-            <div style={{ 
-              backgroundColor: '#ffffff', 
-              padding: '40px 24px', 
-              borderRadius: '0px', 
-              border: '1px solid #e5e5e5', 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.01)', 
-              textAlign: 'center' 
-            }}>
-              <div style={{ 
-                width: '80px', 
-                height: '80px', 
-                backgroundColor: '#000000', 
-                color: '#ffffff', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                fontSize: '28px', 
-                fontWeight: '900', 
-                margin: '0 auto 20px auto' 
-              }}>
-                {user.name ? user.name.charAt(0).toUpperCase() : 'ธ'}
-              </div>
+          <SidebarItem 
+            id="profile" 
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            } 
+            title="โปรไฟล์" 
+            subtitle="การตั้งค่าและระดับสมาชิก" 
+          />
+          
+          <SidebarItem 
+            id="orders" 
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <path d="M16 10a4 4 0 0 1-8 0"/>
+              </svg>
+            } 
+            title="การซื้อ" 
+            subtitle="รายการสั่งซื้อและติดตามสถานะ" 
+          />
+          
+          <SidebarItem 
+            id="wishlist" 
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            } 
+            title="สินค้าที่สนใจ" 
+            subtitle="สินค้าที่คุณบันทึกไว้" 
+          />
 
-              <h3 style={{ fontSize: '18px', fontWeight: '900', margin: '0 0 6px 0', letterSpacing: '0.5px' }}>{user.name}</h3>
-              <p style={{ fontSize: '14px', color: '#737373', margin: '0 0 32px 0' }}>{user.email}</p>
+        </div>
 
-              <Link 
-                to="/" 
-                style={{ 
-                  display: 'block',
-                  width: '100%', 
-                  padding: '12px', 
-                  border: '1px solid #000000', 
-                  backgroundColor: '#ffffff', 
-                  color: '#000000', 
-                  borderRadius: '0px', 
-                  fontSize: '13px', 
-                  fontWeight: '800', 
-                  textDecoration: 'none',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  boxSizing: 'border-box',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={(e) => { e.target.style.backgroundColor = '#000000'; e.target.style.color = '#ffffff'; }}
-                onMouseLeave={(e) => { e.target.style.backgroundColor = '#ffffff'; e.target.style.color = '#000000'; }}
-              >
-                ไปช้อปปิ้งต่อ
-              </Link>
-            </div>
-          </div>
-
-          {/* ขวา: ประวัติคำสั่งซื้อชุดคลีนสุดพรีเมียม (ถอดการแสดงป้ายชำระเงินที่ซ้ำซ้อนออก) */}
-          <div className="lg:col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ 
-              backgroundColor: '#ffffff', 
-              padding: '32px 24px', 
-              borderRadius: '0px', 
-              border: '1px solid #e5e5e5', 
-              boxShadow: '0 4px 20px rgba(0,0,0,0.01)',
-              minHeight: '350px'
-            }}>
-              
-              <h3 style={{ 
-                fontSize: '15px', 
-                fontWeight: '900', 
-                margin: '0 0 24px 0', 
-                textTransform: 'uppercase', 
-                letterSpacing: '1px',
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                borderBottom: '2px solid #000000',
-                paddingBottom: '12px'
-              }}>
-                📦 ประวัติการสั่งซื้อล่าสุด
-              </h3>
-
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: '80px 0', color: '#737373', fontSize: '13px' }}>
-                  กำลังเชื่อมต่อข้อมูลพัสดุ...
+        {/* คอลัมน์ขวา: พื้นที่แสดงเนื้อหาหลัก */}
+        <div style={{ flex: 1, backgroundColor: theme.contentBg, borderRadius: '16px', padding: '40px', minHeight: '600px', border: `1px solid ${theme.border}` }}>
+          
+          {/* TAB: โปรไฟล์ */}
+          {activeTab === 'profile' && (
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '24px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '16px', color: theme.textDark }}>ข้อมูลส่วนตัว</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                <div style={{ width: '80px', height: '80px', backgroundColor: theme.primary, color: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: '700' }}>
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'M'}
                 </div>
+                <div>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', margin: '0 0 4px 0', color: theme.textDark }}>{user.name}</h4>
+                  <p style={{ fontSize: '14px', color: theme.textMuted, margin: '0 0 16px 0' }}>{user.email}</p>
+                  <Link 
+                    to="/" 
+                    style={{ padding: '8px 24px', backgroundColor: theme.primary, color: '#fff', borderRadius: '20px', fontSize: '13px', textDecoration: 'none', display: 'inline-block', transition: 'opacity 0.2s' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                  >
+                    ไปช้อปปิ้งต่อ
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: ประวัติการสั่งซื้อ */}
+          {activeTab === 'orders' && (
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '24px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '16px', color: theme.textDark }}>ประวัติการสั่งซื้อ</h3>
+              
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '60px 0', color: theme.textMuted }}>กำลังโหลด...</div>
               ) : myOrders.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '80px 0', color: '#737373' }}>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '800', letterSpacing: '1px', textTransform: 'uppercase', color: '#000000' }}>คุณยังไม่มีประวัติการสั่งซื้อ</p>
-                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#a3a3a3' }}>เมื่อสั่งซื้อพัสดุของคุณจะขึ้นโชว์ความคืบหน้าที่นี่ทันทีครับ</p>
+                <div style={{ textAlign: 'center', padding: '60px 0', color: theme.textMuted }}>
+                  <p style={{ margin: 0, fontSize: '15px' }}>ยังไม่มีประวัติการสั่งซื้อ</p>
                 </div>
               ) : (
-                /* รายการออเดอร์สไตล์โมโนโครมแบบคลีนสูงสุด */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   {myOrders.map(order => {
                     const currentStep = getDeliveryStep(order.paymentStatus || order.status, order.orderStatus);
                     const statusText = getStatusDescriptionText(order.paymentStatus || order.status, order.orderStatus);
 
                     return (
-                      <div 
-                        key={order.id} 
-                        style={{ 
-                          border: '1px solid #e5e5e5', 
-                          borderRadius: '0px', 
-                          padding: '24px', 
-                          backgroundColor: '#ffffff'
-                        }}
-                      >
-                        {/* รหัสสั่งซื้อ และ วันที่ */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f5f5f5', paddingBottom: '12px', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div key={order.id} style={{ border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '24px', backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(140, 122, 107, 0.04)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px dashed ${theme.border}`, paddingBottom: '16px', marginBottom: '16px' }}>
                           <div>
-                            <span style={{ fontSize: '11px', color: '#737373', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>รหัสคำสั่งซื้อ</span>
-                            <strong style={{ fontSize: '16px', color: '#000000', letterSpacing: '0.5px' }}>{order.id}</strong>
+                            <span style={{ fontSize: '12px', color: theme.textMuted }}>รหัสคำสั่งซื้อ</span>
+                            <strong style={{ fontSize: '14px', display: 'block', marginTop: '4px', color: theme.textDark }}>{order.id}</strong>
                           </div>
                           <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '11px', color: '#737373', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>วันที่สั่งซื้อ</span>
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>
-                              {order.order_date || (order.createdAt ? new Date(order.createdAt).toISOString() : '-')}
-                            </span>
+                            <span style={{ fontSize: '12px', color: theme.textMuted }}>ยอดสุทธิ</span>
+                            <span style={{ fontSize: '16px', fontWeight: '600', display: 'block', marginTop: '4px', color: theme.primary }}>฿{Number(order.totalAmount || order.total || 0).toLocaleString()}</span>
                           </div>
                         </div>
 
-                        {/* รุ่นและยอดรวม และข้อความบรรยายสเตตัสข้างใต้ */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                          <div>
-                            <span style={{ fontSize: '11px', color: '#737373', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>รุ่นและขนาดรองเท้าที่เลือก</span>
-                            <span style={{ fontSize: '14px', fontWeight: '800', color: '#000000', marginTop: '2px', display: 'block' }}>
-                              👟 {order.shoeModel || order.shoe_model || 'สินค้าจาก KickZone'} (ไซส์: {order.size || 'N/A'})
-                            </span>
-                            
-                            {/* บรรยายสถานะผสมผสานอย่างเรียบหรูใต้ชื่อสินค้า */}
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#404040', display: 'block', marginTop: '10px' }}>
-                              {statusText}
-                            </span>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '11px', color: '#737373', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>ยอดรวมสุทธิ</span>
-                            <span style={{ fontSize: '18px', fontWeight: '950', color: '#000000', marginTop: '2px', display: 'block' }}>
-                              ฿{Number(order.totalAmount || order.total || 0).toLocaleString()}
-                            </span>
-                            
-                            {/* แสดงเลขพัสดุถ้ามีจัดส่งแล้ว */}
-                            {order.trackingNumber && order.trackingNumber !== 'N/A' && (
-                              <span style={{ fontSize: '11px', fontWeight: '800', color: '#ffffff', backgroundColor: '#000000', padding: '3px 8px', marginTop: '8px', display: 'inline-block', letterSpacing: '0.5px' }}>
-                                📦 {order.trackingNumber}
-                              </span>
-                            )}
-                          </div>
+                        <div style={{ marginBottom: '24px' }}>
+                          <div style={{ fontSize: '14px', fontWeight: '600', color: theme.textDark }}>{order.shoeModel || 'สินค้าจาก KickZone'} (ไซส์: {order.size || 'N/A'})</div>
+                          <div style={{ fontSize: '13px', color: theme.textMuted, marginTop: '6px' }}>{statusText}</div>
+                          {order.trackingNumber && order.trackingNumber !== 'N/A' && (
+                            <div style={{ marginTop: '8px', fontSize: '11px', display: 'inline-block', padding: '4px 8px', backgroundColor: theme.primary, color: '#fff', borderRadius: '4px' }}>TRACK: {order.trackingNumber}</div>
+                          )}
                         </div>
 
-                        {/* แถบติดตามสถานะชิ้นเดียวครอบจักรวาล (Monochrome Stepper) */}
-                        <div style={{ marginTop: '20px', borderTop: '1px solid #f5f5f5', paddingTop: '20px' }}>
-                          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 10px' }}>
-                            
-                            {/* เส้นเชื่อมด้านหลัง */}
-                            <div style={{ 
-                              position: 'absolute', 
-                              top: '15px', 
-                              left: '0', 
-                              right: '0', 
-                              height: '2px', 
-                              backgroundColor: '#e5e5e5', 
-                              zIndex: 1 
-                            }} />
-                            
-                            {/* แถบขยับสีดำจริง */}
-                            <div style={{ 
-                              position: 'absolute', 
-                              top: '15px', 
-                              left: '0', 
-                              width: `${(currentStep / 3) * 100}%`, 
-                              height: '2px', 
-                              backgroundColor: '#000000', 
-                              zIndex: 2,
-                              transition: 'width 0.4s ease-in-out'
-                            }} />
-
-                            {/* สเต็ปย่อยทั้ง 4 จุด */}
-                            <StepNode isActive={currentStep >= 0} label="ได้รับออเดอร์" icon="📝" />
-                            <StepNode isActive={currentStep >= 1} label="กำลังจัดเตรียม" icon="📦" />
-                            <StepNode isActive={currentStep >= 2} label="ส่งพัสดุแล้ว" icon="🚚" />
-                            <StepNode isActive={currentStep >= 3} label="สำเร็จเรียบร้อย" icon="🏠" />
-
-                          </div>
+                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', padding: '0 10px', marginTop: '20px' }}>
+                          <div style={{ position: 'absolute', top: '12px', left: '20px', right: '20px', height: '2px', backgroundColor: theme.border, zIndex: 1 }} />
+                          <div style={{ position: 'absolute', top: '12px', left: '20px', width: `calc(${(currentStep / 3) * 100}% - 40px)`, height: '2px', backgroundColor: theme.primary, zIndex: 2, transition: 'width 0.4s ease' }} />
+                          <StepNode isActive={currentStep >= 0} label="ได้รับออเดอร์" icon="📝" theme={theme} />
+                          <StepNode isActive={currentStep >= 1} label="กำลังจัดเตรียม" icon="📦" theme={theme} />
+                          <StepNode isActive={currentStep >= 2} label="จัดส่งพัสดุ" icon="🚚" theme={theme} />
+                          <StepNode isActive={currentStep >= 3} label="สำเร็จเรียบร้อย" icon="🏠" theme={theme} />
                         </div>
-
                       </div>
                     );
                   })}
                 </div>
               )}
-
             </div>
-          </div>
+          )}
+
+          {/* TAB: สินค้าที่สนใจ */}
+          {activeTab === 'wishlist' && (
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '24px', borderBottom: `1px solid ${theme.border}`, paddingBottom: '16px', color: theme.textDark }}>สินค้าที่สนใจ</h3>
+              
+              {wishlist.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', minHeight: '300px' }}>
+                  <div style={{ color: theme.border, marginBottom: '16px' }}>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    </svg>
+                  </div>
+                  <p style={{ fontSize: '15px', color: theme.textMuted, marginBottom: '24px' }}>มาเพิ่มหน้านี้ด้วยสินค้าที่คุณสนใจ!</p>
+                  <Link 
+                    to="/" 
+                    style={{ padding: '12px 32px', backgroundColor: theme.primary, color: '#fff', borderRadius: '8px', fontSize: '14px', fontWeight: '500', textDecoration: 'none', transition: 'opacity 0.2s' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                  >
+                    คุณอาจจะชอบสิ่งนี้
+                  </Link>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+                  {wishlist.map((item, index) => (
+                    <div key={index} style={{ border: `1px solid ${theme.border}`, borderRadius: '12px', padding: '16px', backgroundColor: '#ffffff', position: 'relative', textAlign: 'center', boxShadow: '0 2px 8px rgba(140, 122, 107, 0.04)' }}>
+                      <button 
+                        onClick={() => {
+                          const newWishlist = wishlist.filter(w => w.id !== item.id);
+                          setWishlist(newWishlist);
+                          localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+                        }}
+                        style={{ position: 'absolute', top: '12px', right: '12px', background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                        title="เอาออกจากรายการโปรด"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                      </button>
+
+                      <img src={item.image || 'https://via.placeholder.com/200'} alt={item.name} style={{ width: '100%', height: '140px', objectFit: 'contain', marginBottom: '12px' }} />
+                      <div style={{ fontSize: '10px', color: theme.textMuted, textTransform: 'uppercase', marginBottom: '4px' }}>{item.brand || 'KICKZONE'}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: theme.textDark, marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: theme.primary }}>฿{Number(item.price || 0).toLocaleString()}</div>
+                      
+                      <Link 
+                        to={`/product/${item.id}`} 
+                        style={{ display: 'block', marginTop: '16px', padding: '8px 0', backgroundColor: theme.activeBg, color: theme.textDark, borderRadius: '6px', fontSize: '12px', fontWeight: '500', textDecoration: 'none' }}
+                      >
+                        ดูสินค้า
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
-
       </div>
     </div>
   );
 }
 
-/* STREAMING_CHUNK: StepNode subcomponent for clean styling... */
-function StepNode({ isActive, label, icon }) {
+function StepNode({ isActive, label, icon, theme }) {
   return (
-    <div style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '70px' }}>
+    <div style={{ zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '70px' }}>
       <div style={{ 
-        width: '32px', 
-        height: '32px', 
+        width: '26px', 
+        height: '26px', 
         borderRadius: '50%', 
-        backgroundColor: isActive ? '#000000' : '#ffffff', 
-        border: isActive ? '2px solid #000000' : '2px solid #cbd5e1',
-        color: isActive ? '#ffffff' : '#cbd5e1',
+        backgroundColor: isActive ? theme.primary : '#ffffff', 
+        border: isActive ? `2px solid ${theme.primary}` : `2px solid ${theme.border}`,
+        color: isActive ? '#ffffff' : theme.textMuted,
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        fontSize: '14px',
-        fontWeight: 'bold',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-        transition: 'all 0.4s ease'
+        fontSize: '12px',
+        transition: 'all 0.3s ease'
       }}>
         {icon}
       </div>
-      <span style={{ 
-        fontSize: '10px', 
-        fontWeight: isActive ? '900' : '500', 
-        color: isActive ? '#000000' : '#a3a3a3', 
-        marginTop: '8px',
-        display: 'block',
-        letterSpacing: '0.5px'
-      }}>
+      <span style={{ fontSize: '11px', fontWeight: isActive ? '500' : '400', color: isActive ? theme.primary : theme.textMuted, marginTop: '8px', textAlign: 'center' }}>
         {label}
       </span>
     </div>
