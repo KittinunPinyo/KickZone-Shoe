@@ -12,10 +12,20 @@ const initialStock = euSizes.reduce((acc, size) => ({ ...acc, [size]: 0 }), {});
 
 const generateSKU = (brand) => {
   let prefix = 'KZ';
-  if (brand === 'adidas') prefix = 'AD';
-  else if (brand === 'New Balance') prefix = 'NB';
-  else if (brand === 'Puma') prefix = 'PM';
-  else if (brand === 'Nike') prefix = 'NK';
+  if (!brand) {
+    prefix = 'KZ';
+  } else if (brand.toLowerCase() === 'adidas') prefix = 'AD';
+  else if (brand.toLowerCase() === 'new balance') prefix = 'NB';
+  else if (brand.toLowerCase() === 'puma') prefix = 'PM';
+  else if (brand.toLowerCase() === 'nike') prefix = 'NK';
+  else {
+    const words = brand.trim().split(/\s+/);
+    if (words.length > 1) {
+      prefix = (words[0][0] + words[1][0]).toUpperCase();
+    } else {
+      prefix = brand.substring(0, 2).toUpperCase();
+    }
+  }
   return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 };
 
@@ -59,10 +69,13 @@ export default function Admin() {
   const [updatingId, setUpdatingId] = useState(null);
 
   const [productModal, setProductModal] = useState({
-    isOpen: false, mode: 'add', id: null, name: '', brand: 'adidas', price: '', sku: '', color: '', stock: initialStock, image: ''
+    isOpen: false, mode: 'add', id: null, name: '', brand: 'adidas', price: '', sku: '', color: '', releaseDate: '', stock: initialStock, image: '', isCustomBrand: false
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, targetId: null, targetName: '' });
+
+  const defaultBrands = ['adidas'];
+  const uniqueBrands = Array.from(new Set([...defaultBrands, ...products.map(p => p.brand).filter(Boolean)]));
 
   const fetchData = async () => {
     setLoading(true);
@@ -110,9 +123,10 @@ export default function Admin() {
   };
 
   const openAddProductModal = () => {
+    const defaultBrand = uniqueBrands[0] || 'adidas';
     setProductModal({
-      isOpen: true, mode: 'add', id: null, name: '', brand: 'adidas', price: '', 
-      sku: generateSKU('adidas'), color: '', stock: { ...initialStock }, image: ''
+      isOpen: true, mode: 'add', id: null, name: '', brand: defaultBrand, price: '', 
+      sku: generateSKU(defaultBrand), color: '', releaseDate: '', stock: { ...initialStock }, image: '', isCustomBrand: false
     });
   };
 
@@ -125,9 +139,23 @@ export default function Admin() {
       }
     } catch (e) { console.warn("สต็อกเดิมผิดพลาด รีเซ็ตเป็น 0"); }
 
+    // 🌟 ดักการอ่านค่า Database (เพิ่ม color/colour และ releaseDate/release_date)
+    const fetchedColor = product.color || product.colour || '';
+    const fetchedReleaseDate = product.releaseDate || product.release_date || '';
+
     setProductModal({
-      isOpen: true, mode: 'edit', id: product.id, name: product.name || '', brand: product.brand || 'adidas', 
-      price: product.price || '', sku: product.sku || '', color: product.color || '', stock: parsedStock, image: product.image || ''
+      isOpen: true, 
+      mode: 'edit', 
+      id: product.id, 
+      name: product.name || '', 
+      brand: product.brand || uniqueBrands[0], 
+      price: product.price || '', 
+      sku: product.sku || '', 
+      color: fetchedColor, 
+      releaseDate: fetchedReleaseDate, 
+      stock: parsedStock, 
+      image: product.image || '',
+      isCustomBrand: false
     });
   };
 
@@ -144,7 +172,8 @@ export default function Admin() {
     const payload = {
       name: productModal.name, brand: productModal.brand, price: Number(productModal.price) || 0,
       image: productModal.image, sku: productModal.sku, color: productModal.color,
-      releaseDate: new Date().toISOString().split('T')[0], stock: finalStock
+      releaseDate: productModal.releaseDate || '-', 
+      stock: finalStock
     };
 
     const url = productModal.mode === 'add' ? `${API_URL}/products` : `${API_URL}/products/${productModal.id}`;
@@ -258,19 +287,44 @@ export default function Admin() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>แบรนด์สินค้า</label>
-                      <select 
-                        value={productModal.brand} 
-                        onChange={e => {
-                          const newBrand = e.target.value;
-                          setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku }));
-                        }} 
-                        style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}
-                      >
-                        <option value="adidas">adidas</option>
-                        <option value="New Balance">New Balance</option>
-                        <option value="Puma">Puma</option>
-                        <option value="Nike">Nike</option>
-                      </select>
+                      {!productModal.isCustomBrand ? (
+                        <select 
+                          value={productModal.brand} 
+                          onChange={e => {
+                            if (e.target.value === 'ADD_NEW') {
+                              setProductModal(prev => ({ ...prev, isCustomBrand: true, brand: '' }));
+                            } else {
+                              const newBrand = e.target.value;
+                              setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku }));
+                            }
+                          }} 
+                          style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}
+                        >
+                          {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                          <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#8C7A6B' }}>➕ เพิ่มแบรนด์ใหม่...</option>
+                        </select>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            autoFocus type="text" placeholder="พิมพ์แบรนด์ใหม่..." value={productModal.brand} 
+                            onChange={e => {
+                              const newBrand = e.target.value;
+                              setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku }));
+                            }} 
+                            style={{ flex: 1, padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} 
+                          />
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const fallback = uniqueBrands.includes(productModal.brand) && productModal.brand !== '' ? productModal.brand : uniqueBrands[0];
+                              setProductModal(prev => ({ ...prev, isCustomBrand: false, brand: fallback, sku: prev.mode === 'add' ? generateSKU(fallback) : prev.sku }));
+                            }}
+                            style={{ padding: '0 16px', backgroundColor: '#F0EBE6', border: 'none', borderRadius: '12px', color: '#8C7A6B', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ราคา (บาท)</label>
@@ -289,9 +343,16 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ภาพลิงก์พรีวิว URL</label>
-                    <input type="text" value={productModal.image} onChange={e => setProductModal({...productModal, image: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="วางลิงก์รูปภาพที่นี่" />
+                  {/* ช่องพิมพ์ วันที่วางจำหน่าย (type="text") */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ภาพลิงก์พรีวิว URL</label>
+                      <input type="text" value={productModal.image} onChange={e => setProductModal({...productModal, image: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="วางลิงก์รูปภาพที่นี่" />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>วันที่วางจำหน่าย</label>
+                      <input type="text" value={productModal.releaseDate} onChange={e => setProductModal({...productModal, releaseDate: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="เช่น 19/07/2569" />
+                    </div>
                   </div>
 
                   {/* ตารางไซส์ Grid */}
@@ -427,18 +488,19 @@ export default function Admin() {
       </div>
 
       {/* ==========================================
-          Modal: แก้ไขสินค้า (Edit)
+          Modal: แก้ไขสินค้า (Edit) 
           ========================================== */}
       {productModal.isOpen && productModal.mode === 'edit' && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(92, 78, 67, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '16px' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(92, 78, 67, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '20px' }}>
+          
           <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '650px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: '24px', border: '1px solid #E8E1D9', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
             
-            {/* Header (ติดแน่นด้านบน) */}
+            {/* Header */}
             <div style={{ padding: '20px 32px', borderBottom: '1px solid #E8E1D9', backgroundColor: '#ffffff', zIndex: 1 }}>
               <h3 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#5C4E43' }}>📝 แก้ไขข้อมูลสินค้าคลัง</h3>
             </div>
 
-            {/* Scrollable Body (เลื่อนเฉพาะเนื้อหากลาง) */}
+            {/* Scrollable Body */}
             <div style={{ padding: '24px 32px', overflowY: 'auto', flex: 1 }}>
               <form id="editProductForm" onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
@@ -449,10 +511,46 @@ export default function Admin() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>แบรนด์สินค้า</label>
-                    <select value={productModal.brand} onChange={e => setProductModal({...productModal, brand: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}>
-                      <option value="adidas">adidas</option><option value="New Balance">New Balance</option><option value="Puma">Puma</option><option value="Nike">Nike</option>
-                    </select>
+                    {!productModal.isCustomBrand ? (
+                      <select 
+                        value={productModal.brand} 
+                        onChange={e => {
+                          if (e.target.value === 'ADD_NEW') {
+                            setProductModal(prev => ({ ...prev, isCustomBrand: true, brand: '' }));
+                          } else {
+                            const newBrand = e.target.value;
+                            setProductModal(prev => ({ ...prev, brand: newBrand }));
+                          }
+                        }} 
+                        style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}
+                      >
+                        {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                        <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#8C7A6B' }}>➕ เพิ่มแบรนด์ใหม่...</option>
+                      </select>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                          autoFocus type="text" placeholder="พิมพ์แบรนด์ใหม่..." value={productModal.brand} 
+                          onChange={e => {
+                            const newBrand = e.target.value;
+                            setProductModal(prev => ({ ...prev, brand: newBrand }));
+                          }} 
+                          style={{ flex: 1, padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const fallback = uniqueBrands.includes(productModal.brand) && productModal.brand !== '' ? productModal.brand : uniqueBrands[0];
+                            setProductModal(prev => ({ ...prev, isCustomBrand: false, brand: fallback }));
+                          }}
+                          style={{ padding: '0 16px', backgroundColor: '#F0EBE6', border: 'none', borderRadius: '12px', color: '#8C7A6B', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          ยกเลิก
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ราคา (บาท)</label>
                     <input required type="number" value={productModal.price} onChange={e => setProductModal({...productModal, price: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
@@ -470,12 +568,19 @@ export default function Admin() {
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ภาพลิงก์พรีวิว URL</label>
-                  <input type="text" value={productModal.image} onChange={e => setProductModal({...productModal, image: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
+                {/* 🌟 ช่องพิมพ์ วันที่วางจำหน่าย (ดึงค่ามาแล้ว) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ภาพลิงก์พรีวิว URL</label>
+                    <input type="text" value={productModal.image} onChange={e => setProductModal({...productModal, image: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>วันที่วางจำหน่าย</label>
+                    <input type="text" value={productModal.releaseDate} onChange={e => setProductModal({...productModal, releaseDate: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="เช่น 19/07/2569" />
+                  </div>
                 </div>
 
-                {/* ตารางสต็อกแบบ 6 คอลัมน์ที่สมมาตรแบบในรูป */}
+                {/* ตารางสต็อก */}
                 <div style={{ backgroundColor: '#F8F6F3', padding: '20px', borderRadius: '16px', border: '1px solid #E8E1D9' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '16px' }}>จัดการสต็อกสินค้าแยกตามไซส์ (จำนวนคู่)</label>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
@@ -490,7 +595,7 @@ export default function Admin() {
               </form>
             </div>
 
-            {/* Footer / Buttons (ติดแน่นด้านล่างเสมอ) */}
+            {/* Footer / Buttons */}
             <div style={{ padding: '20px 32px', borderTop: '1px solid #E8E1D9', backgroundColor: '#F8F6F3', display: 'flex', gap: '12px' }}>
               <button type="button" onClick={() => setProductModal({...productModal, isOpen: false})} style={{ flex: 1, padding: '14px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
                 ยกเลิก
@@ -504,9 +609,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ==========================================
-          Modal: ยืนยันการลบ (Delete Confirm)
-          ========================================== */}
+      {/* Delete Confirm */}
       {deleteConfirm.isOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(92, 78, 67, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '16px' }}>
           <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '400px', borderRadius: '24px', border: '1px solid #E8E1D9', padding: '32px', textAlign: 'center', boxShadow: '0 10px 30px rgba(92, 78, 67, 0.15)' }}>

@@ -9,42 +9,91 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
   const [selectedSize, setSelectedSize] = useState(null);
   const [showDetails, setShowDetails] = useState(true);
 
+  // 🌟 State สำหรับระบบแจ้งเตือนแบบป๊อปอัป (Toast)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // 🌟 ฟังก์ชันเรียกป๊อปอัป
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 3000); // หายไปเองใน 3 วินาที
+  };
+
+  // รีเซ็ตไซส์ทุกครั้งที่เปลี่ยนสินค้า
   useEffect(() => {
     setSelectedSize(null);
   }, [id]);
 
+  // หาข้อมูลสินค้าจาก ID
   const product = products.find(p => p.id === id || p.id === Number(id));
 
   if (!product) {
     return <div className="text-center py-5 mt-5 fw-bold" style={{ color: '#8C7A6B' }}>กำลังโหลดข้อมูล... หรือไม่พบสินค้านี้</div>;
   }
 
+  // หาสินค้าที่เป็นโมเดลเดียวกันแต่คนละสี (ถ้ามี)
   const colorVariants = products.filter(p => p.name === product.name);
   
+  // ดึงค่าต่างๆ มาโชว์
   const productDetails = {
     brand: product.brand || '-',
-    model: product.name,
+    model: product.name || '-',
     sku: product.sku || '-',
-    color: product.color || '-',
-    releaseDate: product.releaseDate || '-'
+    color: product.color || product.colour || '-', 
+    releaseDate: product.releaseDate || product.release_date || '-' 
   };
 
   const euSizes = ['35.5', '36', '36.5', '37.5', '38', '38.5', '39.5', '40', '40.5', '41.5', '42', '42.5', '43', '44', '44.5', '45', '45.5', '46.5', '47.5'];
   const sizeChart = euSizes.map((size, index) => {
-    const stockCount = product.stock ? Number(product.stock[size] || 0) : 0;
+    // เช็คสต็อก
+    let stockCount = 0;
+    try {
+      const stockObj = typeof product.stock === 'string' ? JSON.parse(product.stock) : product.stock;
+      stockCount = stockObj ? Number(stockObj[size] || 0) : 0;
+    } catch (e) {
+      stockCount = 0;
+    }
     return { id: index + 1, EU: size, available: stockCount > 0 };
   });
 
   const onAddToCart = () => {
     if (!selectedSize) {
-      alert("กรุณาเลือกไซส์ก่อนเพิ่มลงตะกร้าครับ");
+      // 🌟 เปลี่ยนจาก alert() เป็น showToast() แบบแจ้งเตือนข้อผิดพลาด
+      showToast("กรุณาเลือกไซส์ก่อนเพิ่มลงตะกร้าครับ", "error");
       return;
     }
     handleAddToCart({ ...product, selectedSize: `EU ${selectedSize.EU}`, price: product.price });
+    // 🌟 แจ้งเตือนเมื่อเพิ่มลงตะกร้าสำเร็จ
+    showToast("เพิ่มสินค้าลงตะกร้าเรียบร้อยแล้ว!", "success");
   };
 
   return (
-    <div style={{ backgroundColor: '#F8F6F3', minHeight: '100vh', paddingBottom: '50px' }}>
+    <div style={{ backgroundColor: '#F8F6F3', minHeight: '100vh', paddingBottom: '50px', position: 'relative' }}>
+      
+      {/* 🌟 ป๊อปอัปแจ้งเตือน (Toast Notification) */}
+      <div style={{
+        position: 'fixed',
+        top: toast.show ? '30px' : '-100px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: toast.type === 'success' ? '#5C4E43' : '#b87373',
+        color: '#ffffff',
+        padding: '14px 28px',
+        borderRadius: '50px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        transition: 'all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        fontWeight: 'bold',
+        opacity: toast.show ? 1 : 0
+      }}>
+        <span style={{ fontSize: '18px' }}>{toast.type === 'success' ? '🛒' : '⚠️'}</span>
+        {toast.message}
+      </div>
+
       <div className="container py-5">
         
         <button onClick={() => navigate(-1)} className="btn btn-link text-decoration-none fw-bold px-0 mb-4" style={{ color: '#8C7A6B' }}>
@@ -55,11 +104,11 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
           {/* ฝั่งซ้าย: รูปภาพสินค้า */}
           <div className="col-lg-7">
             <div className="position-sticky" style={{ top: '20px' }}>
-              <div className="bg-white rounded-4 d-flex align-items-center justify-content-center p-4 shadow-sm" style={{ backgroundColor: '#F0EBE6' }}>
+              <div className="bg-white rounded-4 d-flex align-items-center justify-content-center p-4 shadow-sm" style={{ backgroundColor: '#F0EBE6', minHeight: '400px' }}>
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="img-fluid" style={{ maxHeight: '400px', width: '100%', objectFit: 'contain' }} />
                 ) : (
-                  <span className="py-5" style={{ color: '#8C7A6B' }}>ไม่มีรูปภาพ</span>
+                  <span className="py-5 fw-bold" style={{ color: '#8C7A6B' }}>ไม่มีรูปภาพ</span>
                 )}
               </div>
             </div>
@@ -70,10 +119,10 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
             <div className="d-flex flex-column h-100">
               
               <div className="text-uppercase fw-bold mb-1" style={{ fontSize: '12px', letterSpacing: '1px', color: '#8C7A6B' }}>
-                {product.brand}
+                {productDetails.brand}
               </div>
               
-              <h2 className="fw-bold mb-3" style={{ color: '#5C4E43' }}>{product.name}</h2>
+              <h2 className="fw-bold mb-3" style={{ color: '#5C4E43' }}>{productDetails.model}</h2>
 
               <h3 className="fw-bold mb-4" style={{ color: '#5C4E43' }}>
                 ฿ {Number(product.price).toLocaleString('th-TH')}
@@ -120,7 +169,7 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
                 </div>
               </div>
 
-              {/* 🌟 ปุ่มสั่งซื้อ / แจ้งเตือนสิทธิ์ Admin */}
+              {/* ปุ่มสั่งซื้อ / แจ้งเตือนสิทธิ์ Admin */}
               {currentUser === 'customer' ? (
                 <button 
                   className="btn w-100 rounded-pill py-3 fw-bold fs-5 mb-3 text-white shadow-sm" 
@@ -150,7 +199,7 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
                 ✅ สินค้าของแท้ 100% | จัดส่งฟรีเมื่อยอดเกิน 3,000 บาท
               </div>
 
-              {/* รายละเอียดสินค้า */}
+              {/* 🌟 รายละเอียดสินค้าด้านล่าง */}
               <div className="mt-auto border-top pt-4" style={{ borderColor: '#E8E1D9' }}>
                 <div className="d-flex justify-content-between align-items-center" style={{ cursor: 'pointer', color: '#5C4E43' }} onClick={() => setShowDetails(!showDetails)}>
                   <h6 className="fw-bold mb-0 text-decoration-underline" style={{ fontSize: '18px' }}>รายละเอียด</h6>
@@ -161,6 +210,7 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
                 
                 {showDetails && (
                   <div className="row g-3 mt-3" style={{ color: '#8C7A6B' }}>
+                    {/* แถวที่ 1 */}
                     <div className="col-4">
                       <div className="text-uppercase" style={{ fontSize: '10px' }}>แบรนด์</div>
                       <div className="fw-bold" style={{ color: '#5C4E43', fontSize: '13px' }}>{productDetails.brand}</div>
@@ -173,11 +223,13 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
                       <div className="text-uppercase" style={{ fontSize: '10px' }}>SKU</div>
                       <div className="fw-bold" style={{ color: '#5C4E43', fontSize: '13px' }}>{productDetails.sku}</div>
                     </div>
-                    <div className="col-6">
+                    
+                    {/* แถวที่ 2 */}
+                    <div className="col-4">
                       <div className="text-uppercase" style={{ fontSize: '10px' }}>สี</div>
                       <div className="fw-bold" style={{ color: '#5C4E43', fontSize: '13px' }}>{productDetails.color}</div>
                     </div>
-                    <div className="col-6">
+                    <div className="col-4">
                       <div className="text-uppercase" style={{ fontSize: '10px' }}>วันที่วางจำหน่าย</div>
                       <div className="fw-bold" style={{ color: '#5C4E43', fontSize: '13px' }}>{productDetails.releaseDate}</div>
                     </div>

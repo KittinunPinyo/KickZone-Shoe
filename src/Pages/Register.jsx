@@ -6,6 +6,17 @@ export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
 
+  // 🌟 State สำหรับระบบแจ้งเตือนแบบป๊อปอัป (Toast)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // 🌟 ฟังก์ชันเรียกป๊อปอัป
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
@@ -18,13 +29,18 @@ export default function Register() {
       const data = await response.json();
       
       if (response.ok) {
-        alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ");
-        navigate('/login');
+        showToast("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ", 'success');
+        
+        // รอให้เห็นป๊อปอัป 1.5 วิก่อนย้ายหน้า
+        setTimeout(() => {
+          navigate('/login');
+        }, 1500);
+
       } else {
-        alert(data.error);
+        showToast(data.error, 'error');
       }
     } catch (error) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+      showToast("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์", 'error');
     }
   };
 
@@ -42,25 +58,53 @@ export default function Register() {
         if (response.ok) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          alert('เข้าสู่ระบบด้วย Google สำเร็จ!');
-          navigate('/');
-          window.location.reload();
+          
+          showToast('เข้าสู่ระบบด้วย Google สำเร็จ!', 'success');
+          
+          setTimeout(() => {
+            navigate('/');
+            window.location.reload();
+          }, 1500);
+
         } else {
-          alert(`ไม่สามารถสมัคร/เข้าสู่ระบบได้: ${data.error}`);
+          showToast(`ไม่สามารถสมัคร/เข้าสู่ระบบได้: ${data.error}`, 'error');
         }
       } catch (error) {
         console.error('Error with Google Login:', error);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
       }
     },
     onError: () => {
-      alert('การเข้าสู่ระบบด้วย Google ล้มเหลว');
+      showToast('การเข้าสู่ระบบด้วย Google ล้มเหลว', 'error');
     }
   });
 
   return (
-    // 🌟 เปลี่ยนสีพื้นหลัง
-    <div className="py-5" style={{ backgroundColor: '#F8F6F3', minHeight: '90vh' }}>
+    <div className="py-5" style={{ backgroundColor: '#F8F6F3', minHeight: '90vh', position: 'relative' }}>
+      
+      {/* 🌟 ป๊อปอัปแจ้งเตือน (Toast Notification) */}
+      <div style={{
+        position: 'fixed',
+        top: toast.show ? '30px' : '-100px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: toast.type === 'success' ? '#5C4E43' : '#b87373',
+        color: '#ffffff',
+        padding: '14px 28px',
+        borderRadius: '50px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        transition: 'all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        fontWeight: 'bold',
+        opacity: toast.show ? 1 : 0
+      }}>
+        <span style={{ fontSize: '18px' }}>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+        {toast.message}
+      </div>
+
       <div className="container py-4">
         <div className="row align-items-center justify-content-center g-5">
           

@@ -21,22 +21,49 @@ export default function Home({ filteredProducts, currentUser, handleAddToCart, w
         <h2 className="fw-bold mb-2" style={{ color: '#5C4E43' }}>ค้นพบสไตล์ของคุณ</h2>
         <p className="mb-4" style={{ color: '#8C7A6B' }}>สินค้าแบรนด์แท้ 100% พร้อมจัดส่ง</p>
 
-        {/* แถบตัวกรอง (Filter Bar) โทนสีครีม/น้ำตาล */}
-        <div className="p-4 rounded-4 mb-4 d-flex align-items-center gap-4 flex-wrap shadow-sm bg-white" style={{ border: '1px solid #E8E1D9' }}>
-          <div className="d-flex align-items-center gap-2">
-            <label className="fw-bold mb-0" style={{ color: '#5C4E43' }}>แบรนด์:</label>
-            <select className="form-select form-select-sm w-auto border-0 fw-bold rounded-pill px-3" style={{ backgroundColor: '#F8F6F3', color: '#8C7A6B' }} value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)}>
-              {availableBrands.map((brand, index) => <option key={index} value={brand}>{brand}</option>)}
-            </select>
+        {/* ==========================================
+            แถบตัวกรอง (Filter Bar) - จัดกลุ่มใหม่ให้ราคาชิดซ้าย
+            ========================================== */}
+        <div className="p-4 rounded-4 mb-4 d-flex align-items-center justify-content-between flex-wrap shadow-sm bg-white" style={{ border: '1px solid #E8E1D9', gap: '20px' }}>
+          
+          {/* 🌟 จัดกลุ่ม 1 (แบรนด์) และ 2 (ราคา) ให้อยู่ฝั่งซ้ายด้วยกัน */}
+          <div className="d-flex align-items-center flex-wrap" style={{ gap: '40px', flex: 1 }}>
+            
+            {/* 1. ส่วนเลือกแบรนด์ */}
+            <div className="d-flex align-items-center gap-3">
+              <label className="fw-bold mb-0 text-nowrap" style={{ color: '#5C4E43' }}>แบรนด์:</label>
+              <select 
+                className="form-select form-select-sm border-0 fw-bold rounded-pill px-3 py-2 shadow-none" 
+                style={{ backgroundColor: '#F8F6F3', color: '#8C7A6B', cursor: 'pointer', minWidth: '120px' }} 
+                value={selectedBrand} 
+                onChange={(e) => setSelectedBrand(e.target.value)}
+              >
+                {availableBrands.map((brand, index) => <option key={index} value={brand}>{brand}</option>)}
+              </select>
+            </div>
+
+            {/* 2. ส่วนเลื่อนราคา (ตอนนี้จะอยู่ชิดซ้ายตามแบรนด์แล้ว) */}
+            <div className="d-flex align-items-center gap-3" style={{ minWidth: '250px', maxWidth: '400px', flex: 1 }}>
+              <label className="fw-bold mb-0 text-nowrap" style={{ color: '#5C4E43' }}>ราคาไม่เกิน: ฿{maxPrice.toLocaleString()}</label>
+              <input 
+                type="range" 
+                className="form-range w-100" 
+                min="0" max="50000" step="500" 
+                value={maxPrice} 
+                onChange={(e) => setMaxPrice(Number(e.target.value))} 
+                style={{ accentColor: '#8C7A6B' }} 
+              />
+            </div>
+
           </div>
 
-          <div className="d-flex align-items-center gap-3 flex-grow-1">
-            <label className="fw-bold mb-0 text-nowrap" style={{ color: '#5C4E43' }}>ราคาไม่เกิน: ฿{maxPrice.toLocaleString()}</label>
-            <input type="range" className="form-range" min="0" max="50000" step="500" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} style={{ maxWidth: '300px', accentColor: '#8C7A6B' }} />
+          {/* 🌟 3. สรุปจำนวนสินค้า (ผลักมาอยู่ฝั่งขวาสุด) */}
+          <div className="small fw-bold text-nowrap" style={{ color: '#8C7A6B' }}>
+            พบสินค้า {displayProducts.length} รายการ
           </div>
 
-          <div className="small fw-bold" style={{ color: '#8C7A6B' }}>พบสินค้า {displayProducts.length} รายการ</div>
         </div>
+        {/* ========================================== */}
 
         <div className="mb-4"><PromotionsList /></div>
 
@@ -66,7 +93,7 @@ export default function Home({ filteredProducts, currentUser, handleAddToCart, w
               );
             })
           ) : (
-            <div className="text-center py-5" style={{ color: '#8C7A6B' }}><h4>ไม่พบสินค้า</h4></div>
+            <div className="text-center py-5" style={{ color: '#8C7A6B' }}><h4>ไม่พบสินค้าที่ตรงกับเงื่อนไข</h4></div>
           )}
         </div>
       </div>

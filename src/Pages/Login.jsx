@@ -7,6 +7,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
 
+  // 🌟 State สำหรับระบบแจ้งเตือนแบบป๊อปอัป (Toast)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  // 🌟 ฟังก์ชันเรียกป๊อปอัป
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    // ให้ป๊อปอัปหายไปเองใน 3 วินาที (กรณี error)
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 3000);
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -21,15 +33,21 @@ export default function Login() {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        alert('เข้าสู่ระบบสำเร็จ!');
-        navigate('/');
-        window.location.reload(); 
+        
+        showToast('เข้าสู่ระบบสำเร็จ!', 'success');
+        
+        // หน่วงเวลา 1.5 วินาทีให้โชว์ป๊อปอัปก่อน แล้วค่อยรีโหลดหน้า
+        setTimeout(() => {
+          navigate('/');
+          window.location.reload(); 
+        }, 1500);
+
       } else {
-        alert(`เข้าสู่ระบบไม่สำเร็จ: ${data.error}`);
+        showToast(`เข้าสู่ระบบไม่สำเร็จ: ${data.error}`, 'error');
       }
     } catch (error) {
       console.error('Error logging in:', error);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
     }
   };
 
@@ -47,25 +65,53 @@ export default function Login() {
         if (response.ok) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          alert('เข้าสู่ระบบด้วย Google สำเร็จ!');
-          navigate('/');
-          window.location.reload();
+          
+          showToast('เข้าสู่ระบบด้วย Google สำเร็จ!', 'success');
+          
+          setTimeout(() => {
+            navigate('/');
+            window.location.reload();
+          }, 1500);
+
         } else {
-          alert(`ไม่สามารถเข้าสู่ระบบได้: ${data.error}`);
+          showToast(`ไม่สามารถเข้าสู่ระบบได้: ${data.error}`, 'error');
         }
       } catch (error) {
         console.error('Error with Google Login:', error);
-        alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
       }
     },
     onError: () => {
-      alert('การเข้าสู่ระบบด้วย Google ล้มเหลว');
+      showToast('การเข้าสู่ระบบด้วย Google ล้มเหลว', 'error');
     }
   });
 
   return (
-    // 🌟 เปลี่ยนสีพื้นหลังให้เข้ากับโลโก้
-    <div className="py-5" style={{ backgroundColor: '#F8F6F3', minHeight: '90vh' }}>
+    <div className="py-5" style={{ backgroundColor: '#F8F6F3', minHeight: '90vh', position: 'relative' }}>
+      
+      {/* 🌟 ป๊อปอัปแจ้งเตือน (Toast Notification) */}
+      <div style={{
+        position: 'fixed',
+        top: toast.show ? '30px' : '-100px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        backgroundColor: toast.type === 'success' ? '#5C4E43' : '#b87373',
+        color: '#ffffff',
+        padding: '14px 28px',
+        borderRadius: '50px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+        transition: 'all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        fontWeight: 'bold',
+        opacity: toast.show ? 1 : 0
+      }}>
+        <span style={{ fontSize: '18px' }}>{toast.type === 'success' ? '✅' : '⚠️'}</span>
+        {toast.message}
+      </div>
+
       <div className="container py-4">
         <div className="row align-items-center justify-content-center g-5">
           
@@ -79,7 +125,6 @@ export default function Login() {
               />
             </div>
             
-            {/* 🌟 เปลี่ยนสีกล่องข้อความไฮไลต์ */}
             <div className="d-inline-block px-4 py-2 rounded-pill mb-3 fw-bold shadow-sm" style={{ backgroundColor: '#E8E1D9', color: '#5C4E43' }}>
               ช้อปกับเราง่ายๆ ใน 5 ขั้นตอน
             </div>
@@ -127,7 +172,6 @@ export default function Login() {
                   <label className="form-label small fw-bold mb-1" style={{ color: '#8C7A6B' }}>รหัสผ่าน</label>
                   <input type="password" className="form-control form-control-lg rounded-3 bg-light border-0" required value={password} onChange={e => setPassword(e.target.value)} placeholder="รหัสผ่าน" style={{ fontSize: '14px' }} />
                 </div>
-                {/* 🌟 เปลี่ยนปุ่มหลักให้เป็นสีน้ำตาลตุ่น */}
                 <button type="submit" className="btn btn-lg w-100 mb-3 rounded-pill fw-bold text-white shadow-sm" style={{ fontSize: '15px', backgroundColor: '#8C7A6B' }}>
                   เข้าสู่ระบบ
                 </button>
