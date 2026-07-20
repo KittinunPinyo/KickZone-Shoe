@@ -43,6 +43,17 @@ const getStatusSelectStyle = (status) => {
   }
 };
 
+const getRoleSelectStyle = (role) => {
+  const baseStyle = {
+    borderRadius: '8px', padding: '8px 14px', fontWeight: 'bold', fontSize: '13px', 
+    cursor: 'pointer', outline: 'none', transition: 'all 0.2s'
+  };
+  if (role === 'admin') {
+    return { ...baseStyle, backgroundColor: '#5C4E43', color: '#ffffff', border: 'none' };
+  }
+  return { ...baseStyle, backgroundColor: '#ffffff', color: '#8C7A6B', border: '2px solid #8C7A6B' };
+};
+
 const getThaiStatus = (paymentStatus, orderStatus) => {
   const pay = (paymentStatus || '').trim().toUpperCase();
   const order = (orderStatus || '').trim().toUpperCase();
@@ -61,7 +72,8 @@ const getThaiStatus = (paymentStatus, orderStatus) => {
 export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
-  const [activeTab, setActiveTab] = useState('products');
+  const [users, setUsers] = useState([]); // 🌟 เพิ่มสเตตัสเก็บข้อมูลผู้ใช้
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -73,19 +85,33 @@ export default function Admin() {
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, targetId: null, targetName: '' });
+  const [userDeleteConfirm, setUserDeleteConfirm] = useState({ isOpen: false, targetId: null, targetName: '' }); // 🌟 เพิ่มยืนยันลบผู้ใช้
 
   const defaultBrands = ['adidas'];
   const uniqueBrands = Array.from(new Set([...defaultBrands, ...products.map(p => p.brand).filter(Boolean)]));
 
   const fetchData = async () => {
     setLoading(true);
+    const token = localStorage.getItem('token');
     try {
+      const headers = { 'Authorization': `Bearer ${token}` };
+
       const ordersResponse = await fetch(`${API_URL}/orders`);
       if (ordersResponse.ok) setOrders(await ordersResponse.json());
+
       const productsResponse = await fetch(`${API_URL}/products`);
       if (productsResponse.ok) setProducts(await productsResponse.json());
+
+      // 🌟 ดึงข้อมูลรายชื่อผู้ใช้งานในระบบ
+      const usersResponse = await fetch(`${API_URL}/users`, { headers });
+      if (usersResponse.ok) setUsers(await usersResponse.json());
+      
       setError(null);
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -118,6 +144,49 @@ export default function Admin() {
     } catch (err) { setError(err.message); } finally { setUpdatingId(null); }
   };
 
+  // 🌟 ฟังก์ชันอัปเดตสิทธิ์ (Role) ของผู้ใช้งาน
+  const handleRoleUpdate = async (userId, newRole) => {
+    setError(null);
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ role: newRole })
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || 'เปลี่ยนสิทธิ์ผู้ใช้ไม่สำเร็จ');
+      
+      setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      setSuccess('อัปเดตสิทธิ์ผู้ใช้งานเรียบร้อยแล้ว');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) { 
+      setError(err.message); 
+    }
+  };
+
+  // 🌟 ฟังก์ชันดำเนินการลบผู้ใช้งานออกจากระบบ
+  const executeDeleteUser = async () => {
+    setError(null);
+    const token = localStorage.getItem('token');
+    try {
+      const response = await fetch(`${API_URL}/users/${userDeleteConfirm.targetId}`, { 
+          method: 'DELETE', 
+          headers: { 'Authorization': `Bearer ${token}` } 
+      });
+      const resData = await response.json();
+      if (!response.ok) throw new Error(resData.error || 'ไม่สามารถลบผู้ใช้ออกจากระบบได้');
+      
+      setSuccess('ลบผู้ใช้งานเรียบร้อยแล้ว');
+      setUserDeleteConfirm({ isOpen: false, targetId: null, targetName: '' });
+      fetchData(); 
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) { 
+      setError(err.message); 
+      setUserDeleteConfirm({ isOpen: false, targetId: null, targetName: '' }); 
+    }
+  };
+
   const handleStockChange = (size, value) => {
     setProductModal(prev => ({ ...prev, stock: { ...prev.stock, [size]: value } }));
   };
@@ -139,23 +208,11 @@ export default function Admin() {
       }
     } catch (e) { console.warn("สต็อกเดิมผิดพลาด รีเซ็ตเป็น 0"); }
 
-    // 🌟 ดักการอ่านค่า Database (เพิ่ม color/colour และ releaseDate/release_date)
     const fetchedColor = product.color || product.colour || '';
     const fetchedReleaseDate = product.releaseDate || product.release_date || '';
 
     setProductModal({
-      isOpen: true, 
-      mode: 'edit', 
-      id: product.id, 
-      name: product.name || '', 
-      brand: product.brand || uniqueBrands[0], 
-      price: product.price || '', 
-      sku: product.sku || '', 
-      color: fetchedColor, 
-      releaseDate: fetchedReleaseDate, 
-      stock: parsedStock, 
-      image: product.image || '',
-      isCustomBrand: false
+      isOpen: true, mode: 'edit', id: product.id, name: product.name || '', brand: product.brand || uniqueBrands[0], price: product.price || '', sku: product.sku || '', color: fetchedColor, releaseDate: fetchedReleaseDate, stock: parsedStock, image: product.image || '', isCustomBrand: false
     });
   };
 
@@ -170,10 +227,7 @@ export default function Admin() {
     });
 
     const payload = {
-      name: productModal.name, brand: productModal.brand, price: Number(productModal.price) || 0,
-      image: productModal.image, sku: productModal.sku, color: productModal.color,
-      releaseDate: productModal.releaseDate || '-', 
-      stock: finalStock
+      name: productModal.name, brand: productModal.brand, price: Number(productModal.price) || 0, image: productModal.image, sku: productModal.sku, color: productModal.color, releaseDate: productModal.releaseDate || '-', stock: finalStock
     };
 
     const url = productModal.mode === 'add' ? `${API_URL}/products` : `${API_URL}/products/${productModal.id}`;
@@ -209,8 +263,11 @@ export default function Admin() {
     } catch (err) { setError(err.message); setDeleteConfirm({ isOpen: false, targetId: null, targetName: '' }); }
   };
 
+  // กรองข้อมูลค้นหา
   const filteredOrders = orders.filter(o => getSafeEmail(o).toLowerCase().includes(searchTerm.toLowerCase()) || (o.id || '').toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredProducts = products.filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.brand || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = users.filter(u => (u.name || u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) || (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  
   const paidOrders = orders.filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'ชำระเงินสำเร็จ');
   const totalSales = paidOrders.reduce((sum, o) => sum + getSafeTotal(o), 0);
   const pendingSlipCount = orders.filter(o => getThaiStatus(o.paymentStatus, o.orderStatus) === 'ได้รับออเดอร์').length;
@@ -221,17 +278,16 @@ export default function Admin() {
         
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-          <span style={{ fontSize: '24px' }}></span>
           <h1 style={{ fontSize: '26px', fontWeight: '900', margin: 0, letterSpacing: '0.5px', color: '#5C4E43' }}>Admin Panel</h1>
         </div>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' }}>
-          {['dashboard', 'products', 'orders', 'reviews', 'promotions'].map(tab => (
+          {['dashboard', 'products', 'orders', 'users', 'reviews', 'promotions'].map(tab => (
             <button key={tab} onClick={() => { setActiveTab(tab); setSearchTerm(''); }}
               style={{ padding: '10px 24px', borderRadius: '50px', border: activeTab === tab ? 'none' : '1px solid #E8E1D9', backgroundColor: activeTab === tab ? '#8C7A6B' : '#ffffff', color: activeTab === tab ? '#ffffff' : '#8C7A6B', fontWeight: '700', fontSize: '14px', cursor: 'pointer', transition: 'all 0.2s', textTransform: 'capitalize' }}
             >
-              {tab}
+              {tab === 'users' ? 'Manage Users' : tab}
             </button>
           ))}
         </div>
@@ -240,33 +296,124 @@ export default function Admin() {
         {success && <div style={{ padding: '16px', backgroundColor: '#8C7A6B', color: '#ffffff', marginBottom: '24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>✓ {success}</div>}
         {error && <div style={{ padding: '16px', backgroundColor: '#b87373', color: '#ffffff', marginBottom: '24px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>⚠️ ข้อผิดพลาด: {error}</div>}
 
-        {/* Search */}
-        {activeTab !== 'dashboard' && (
+        {/* Search Input */}
+        {activeTab !== 'dashboard' && activeTab !== 'reviews' && activeTab !== 'promotions' && (
           <div style={{ marginBottom: '24px' }}>
-            <input type="text" placeholder={activeTab === 'products' ? " ค้นหารหัส, ชื่อ, แบรนด์..." : " ค้นหาตามเลขออเดอร์ หรืออีเมล..."} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', maxWidth: '400px', padding: '12px 20px', border: '1px solid #E8E1D9', borderRadius: '50px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }} />
+            <input type="text" 
+              placeholder={
+                activeTab === 'products' ? " ค้นหารหัส, ชื่อ, แบรนด์..." : 
+                activeTab === 'orders' ? " ค้นหาตามเลขออเดอร์ หรืออีเมล..." : 
+                " ค้นหาชื่อ หรืออีเมลผู้ใช้งาน..."
+              } 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              style={{ width: '100%', maxWidth: '400px', padding: '12px 20px', border: '1px solid #E8E1D9', borderRadius: '50px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }} 
+            />
           </div>
         )}
 
-        {/* ======================= Dashboard ======================= */}
+        {/* ======================= Dashboard (อัปเกรดดีไซน์ใหม่) ======================= */}
         {activeTab === 'dashboard' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
-            {[{ title: 'ยอดขายสุทธิทั้งหมด', value: `฿${totalSales.toLocaleString('th-TH')}` }, { title: 'จำนวนคำสั่งซื้อรวม', value: `${orders.length} ออเดอร์` }, { title: 'ได้รับออเดอร์แล้ว', value: `${pendingSlipCount} รายการ` }, { title: 'รองเท้าในระบบคลัง', value: `${products.length} รายการ` }].map((stat, i) => (
-              <div key={i} style={{ backgroundColor: '#ffffff', padding: '24px', border: '1px solid #E8E1D9', borderRadius: '16px' }}>
-                <span style={{ fontSize: '12px', color: '#8C7A6B', fontWeight: 'bold' }}>{stat.title}</span>
-                <h3 style={{ fontSize: '28px', fontWeight: '950', color: '#5C4E43', margin: '8px 0 0 0' }}>{stat.value}</h3>
-              </div>
-            ))}
-          </div>
+          <>
+            <style>{`
+              .stat-card {
+                background-color: #ffffff;
+                padding: 24px;
+                border: 1px solid #E8E1D9;
+                border-radius: 20px;
+                box-shadow: 0 4px 6px -1px rgba(92, 78, 67, 0.05), 0 2px 4px -1px rgba(92, 78, 67, 0.03);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                position: relative;
+                overflow: hidden;
+              }
+              .stat-card:hover {
+                transform: translateY(-6px);
+                box-shadow: 0 12px 24px -4px rgba(92, 78, 67, 0.12), 0 8px 12px -6px rgba(92, 78, 67, 0.08);
+                border-color: #D5CCC3;
+              }
+              .icon-wrapper {
+                width: 48px;
+                height: 48px;
+                border-radius: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+            `}</style>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
+              {[
+                { 
+                  title: 'ยอดขายสุทธิทั้งหมด', 
+                  value: `฿${totalSales.toLocaleString('th-TH')}`, 
+                  unit: '',
+                  color: '#10B981', bg: '#D1FAE5',
+                  icon: <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                }, 
+                { 
+                  title: 'จำนวนคำสั่งซื้อรวม', 
+                  value: orders.length, 
+                  unit: 'ออเดอร์',
+                  color: '#3B82F6', bg: '#DBEAFE',
+                  icon: <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                }, 
+                { 
+                  title: 'ได้รับออเดอร์แล้ว', 
+                  value: pendingSlipCount, 
+                  unit: 'รายการ',
+                  color: '#F59E0B', bg: '#FEF3C7',
+                  icon: <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                }, 
+                { 
+                  title: 'สมาชิกในระบบ', 
+                  value: users.length, 
+                  unit: 'คน',
+                  color: '#8B5CF6', bg: '#EDE9FE',
+                  icon: <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                }, 
+                { 
+                  title: 'รองเท้าในระบบคลัง', 
+                  value: products.length, 
+                  unit: 'รายการ',
+                  color: '#EC4899', bg: '#FCE7F3',
+                  icon: <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                }
+              ].map((stat, i) => (
+                <div key={i} className="stat-card">
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <div className="icon-wrapper" style={{ backgroundColor: stat.bg, color: stat.color }}>
+                      {stat.icon}
+                    </div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '13px', color: '#8C7A6B', fontWeight: 'bold', letterSpacing: '0.5px' }}>{stat.title}</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
+                      <h3 style={{ fontSize: '32px', fontWeight: '950', color: '#5C4E43', margin: 0, lineHeight: '1.1' }}>
+                        {stat.value}
+                      </h3>
+                      {stat.unit && (
+                        <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#A69B91' }}>
+                          {stat.unit}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* ======================= Products ======================= */}
         {activeTab === 'products' && (
           <div>
-            {/* Accordion เพิ่มสินค้า */}
             <div onClick={() => productModal.isOpen && productModal.mode === 'add' ? setProductModal({ ...productModal, isOpen: false }) : openAddProductModal()} 
                  style={{ backgroundColor: '#ffffff', border: '1px solid #E8E1D9', borderRadius: '16px', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: productModal.isOpen && productModal.mode === 'add' ? '16px' : '32px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', transition: 'all 0.2s' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '18px' }}></span><span style={{ color: '#8C7A6B', fontWeight: 'bold', fontSize: '15px' }}>เพิ่มสินค้าใหม่</span>
+                <span style={{ color: '#8C7A6B', fontWeight: 'bold', fontSize: '15px' }}>เพิ่มสินค้าใหม่</span>
               </div>
               <span style={{ color: '#8C7A6B' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -275,54 +422,26 @@ export default function Admin() {
               </span>
             </div>
 
-            {/* ฟอร์มเพิ่มสินค้า */}
-            {productModal.isOpen && productModal.mode === 'add' && (
+            {/* ฟอร์มเพิ่ม/แก้ไขสินค้า */}
+            {productModal.isOpen && (
               <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #E8E1D9', padding: '24px', marginBottom: '32px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
                 <form onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ชื่อรุ่นรองเท้า</label>
                     <input required type="text" value={productModal.name} onChange={e => setProductModal({...productModal, name: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="เช่น Samba OG Shoes" />
                   </div>
-
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>แบรนด์สินค้า</label>
                       {!productModal.isCustomBrand ? (
-                        <select 
-                          value={productModal.brand} 
-                          onChange={e => {
-                            if (e.target.value === 'ADD_NEW') {
-                              setProductModal(prev => ({ ...prev, isCustomBrand: true, brand: '' }));
-                            } else {
-                              const newBrand = e.target.value;
-                              setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku }));
-                            }
-                          }} 
-                          style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}
-                        >
+                        <select value={productModal.brand} onChange={e => { if (e.target.value === 'ADD_NEW') { setProductModal(prev => ({ ...prev, isCustomBrand: true, brand: '' })); } else { const newBrand = e.target.value; setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku })); } }} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}>
                           {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
-                          <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#8C7A6B' }}>➕ เพิ่มแบรนด์ใหม่...</option>
+                          <option value="ADD_NEW">➕ เพิ่มแบรนด์ใหม่...</option>
                         </select>
                       ) : (
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <input 
-                            autoFocus type="text" placeholder="พิมพ์แบรนด์ใหม่..." value={productModal.brand} 
-                            onChange={e => {
-                              const newBrand = e.target.value;
-                              setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku }));
-                            }} 
-                            style={{ flex: 1, padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} 
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => {
-                              const fallback = uniqueBrands.includes(productModal.brand) && productModal.brand !== '' ? productModal.brand : uniqueBrands[0];
-                              setProductModal(prev => ({ ...prev, isCustomBrand: false, brand: fallback, sku: prev.mode === 'add' ? generateSKU(fallback) : prev.sku }));
-                            }}
-                            style={{ padding: '0 16px', backgroundColor: '#F0EBE6', border: 'none', borderRadius: '12px', color: '#8C7A6B', fontWeight: 'bold', cursor: 'pointer' }}
-                          >
-                            ยกเลิก
-                          </button>
+                          <input autoFocus type="text" placeholder="พิมพ์แบรนด์ใหม่..." value={productModal.brand} onChange={e => { const newBrand = e.target.value; setProductModal(prev => ({ ...prev, brand: newBrand, sku: prev.mode === 'add' ? generateSKU(newBrand) : prev.sku })); }} style={{ flex: 1, padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
+                          <button type="button" onClick={() => { const fallback = uniqueBrands.includes(productModal.brand) && productModal.brand !== '' ? productModal.brand : uniqueBrands[0]; setProductModal(prev => ({ ...prev, isCustomBrand: false, brand: fallback, sku: prev.mode === 'add' ? generateSKU(fallback) : prev.sku })); }} style={{ padding: '0 16px', backgroundColor: '#F0EBE6', border: 'none', borderRadius: '12px', color: '#8C7A6B', fontWeight: 'bold', cursor: 'pointer' }}>ยกเลิก</button>
                         </div>
                       )}
                     </div>
@@ -331,7 +450,6 @@ export default function Admin() {
                       <input required type="number" value={productModal.price} onChange={e => setProductModal({...productModal, price: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="3500" />
                     </div>
                   </div>
-
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>รหัส SKU (สร้างอัตโนมัติ)</label>
@@ -342,8 +460,6 @@ export default function Admin() {
                       <input type="text" value={productModal.color} onChange={e => setProductModal({...productModal, color: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="White/Black/Gum" />
                     </div>
                   </div>
-
-                  {/* ช่องพิมพ์ วันที่วางจำหน่าย (type="text") */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ภาพลิงก์พรีวิว URL</label>
@@ -354,8 +470,6 @@ export default function Admin() {
                       <input type="text" value={productModal.releaseDate} onChange={e => setProductModal({...productModal, releaseDate: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="เช่น 19/07/2569" />
                     </div>
                   </div>
-
-                  {/* ตารางไซส์ Grid */}
                   <div style={{ backgroundColor: '#F8F6F3', padding: '16px', borderRadius: '12px', border: '1px solid #E8E1D9' }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '12px' }}>จัดการสต็อกสินค้าแยกตามไซส์ (จำนวนคู่)</label>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: '10px' }}>
@@ -367,7 +481,6 @@ export default function Admin() {
                       ))}
                     </div>
                   </div>
-
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
                     <button type="button" onClick={() => setProductModal({...productModal, isOpen: false})} style={{ padding: '12px 24px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>ยกเลิก</button>
                     <button type="submit" style={{ padding: '12px 24px', border: 'none', backgroundColor: '#8C7A6B', color: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>บันทึกลงระบบ</button>
@@ -376,10 +489,10 @@ export default function Admin() {
               </div>
             )}
 
+            {/* ตารางสินค้า */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#5C4E43', margin: 0 }}>รายการสินค้า ({filteredProducts.length})</h3>
             </div>
-
             {loading ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: '#8C7A6B', fontWeight: 'bold' }}>กำลังซิงค์และเชื่อมข้อมูลรองเท้า...</div>
             ) : (
@@ -413,8 +526,8 @@ export default function Admin() {
                           <td style={{ padding: '20px 24px', fontSize: '15px', fontWeight: '900', color: '#d97777' }}>฿{prod.price.toLocaleString()}</td>
                           <td style={{ padding: '20px 24px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              <button onClick={() => openEditProductModal(prod)} style={{ padding: '6px 12px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}>แก้ไข</button>
-                              <button onClick={() => setDeleteConfirm({ isOpen: true, targetId: prod.id, targetName: prod.name })} style={{ padding: '6px 12px', border: '1px solid #d97777', backgroundColor: '#ffffff', color: '#d97777', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}>ลบ</button>
+                              <button type="button" onClick={() => openEditProductModal(prod)} style={{ padding: '6px 12px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}>แก้ไข</button>
+                              <button type="button" onClick={() => setDeleteConfirm({ isOpen: true, targetId: prod.id, targetName: prod.name })} style={{ padding: '6px 12px', border: '1px solid #d97777', backgroundColor: '#ffffff', color: '#d97777', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}>ลบ</button>
                             </div>
                           </td>
                         </tr>
@@ -452,23 +565,26 @@ export default function Admin() {
                     ) : (
                       filteredOrders.map(order => {
                         const customerEmail = getSafeEmail(order);
-                        const displayTotal = getSafeTotal(order);
-                        const currentStatus = getThaiStatus(order.paymentStatus, order.orderStatus);
+                        const thaiStatus = getThaiStatus(order.paymentStatus, order.orderStatus);
+
                         return (
                           <tr key={order.id} style={{ borderBottom: '1px solid #F8F6F3', verticalAlign: 'middle' }}>
-                            <td style={{ padding: '20px 24px' }}><span style={{ color: '#8C7A6B', fontWeight: 'bold', fontSize: '14px' }}>{order.id}</span></td>
-                            <td style={{ padding: '20px 24px', fontSize: '14px', fontWeight: 'bold', color: '#5C4E43' }}>{customerEmail}</td>
-                            <td style={{ padding: '20px 24px', fontSize: '15px', fontWeight: '900', color: '#d97777' }}>฿{displayTotal.toLocaleString('th-TH')}</td>
+                            <td style={{ padding: '20px 24px', fontSize: '13px', color: '#8C7A6B', fontWeight: 'bold' }}>#{order.id}</td>
+                            <td style={{ padding: '20px 24px', fontSize: '14px', color: '#5C4E43' }}>{customerEmail}</td>
+                            <td style={{ padding: '20px 24px', fontSize: '15px', fontWeight: '900', color: '#5C4E43' }}>฿{getSafeTotal(order).toLocaleString()}</td>
                             <td style={{ padding: '20px 24px' }}>
                               <select 
-                                value={currentStatus} onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
-                                style={{ appearance: 'none', paddingRight: '36px', backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center', ...getStatusSelectStyle(currentStatus) }}
+                                value={thaiStatus}
+                                onChange={(e) => handleStatusUpdate(order.id, e.target.value)}
+                                disabled={updatingId === order.id}
+                                style={getStatusSelectStyle(thaiStatus)}
                               >
                                 <option value="ได้รับออเดอร์">ได้รับออเดอร์</option>
                                 <option value="กำลังจัดเตรียม">กำลังจัดเตรียม</option>
                                 <option value="ส่งพัสดุแล้ว">ส่งพัสดุแล้ว</option>
                                 <option value="สำเร็จเรียบร้อย">สำเร็จเรียบร้อย</option>
                               </select>
+                              {updatingId === order.id && <span style={{ marginLeft: '12px', fontSize: '12px', color: '#8C7A6B' }}>กำลังบันทึก...</span>}
                             </td>
                           </tr>
                         );
@@ -481,149 +597,104 @@ export default function Admin() {
           </div>
         )}
 
-        {/* ======================= Reviews & Promotions ======================= */}
-        {activeTab === 'reviews' && <ManageReviews />}
-        {activeTab === 'promotions' && <ManagePromotions />}
+        {/* ======================= Users ======================= */}
+        {activeTab === 'users' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '900', color: '#5C4E43', margin: 0 }}>จัดการข้อมูลผู้ใช้งาน ({filteredUsers.length})</h3>
+            </div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#8C7A6B', fontSize: '14px', fontWeight: 'bold' }}>กำลังโหลดข้อมูลผู้ใช้งาน...</div>
+            ) : (
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #E8E1D9', borderRadius: '16px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F0EBE6', borderBottom: '1px solid #E8E1D9' }}>
+                      <th style={{ padding: '18px 24px', fontSize: '13px', fontWeight: '900', color: '#5C4E43' }}>ID</th>
+                      <th style={{ padding: '18px 24px', fontSize: '13px', fontWeight: '900', color: '#5C4E43' }}>ชื่อผู้ใช้</th>
+                      <th style={{ padding: '18px 24px', fontSize: '13px', fontWeight: '900', color: '#5C4E43' }}>อีเมล</th>
+                      <th style={{ padding: '18px 24px', fontSize: '13px', fontWeight: '900', color: '#5C4E43' }}>สิทธิ์ (Role)</th>
+                      <th style={{ padding: '18px 24px', fontSize: '13px', fontWeight: '900', color: '#5C4E43' }}>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.length === 0 ? (
+                      <tr><td colSpan="5" style={{ padding: '48px 24px', textAlign: 'center', color: '#8C7A6B' }}>📭 ไม่พบข้อมูลผู้ใช้งาน</td></tr>
+                    ) : (
+                      filteredUsers.map(user => (
+                        <tr key={user.id} style={{ borderBottom: '1px solid #F8F6F3', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '20px 24px', fontSize: '13px', color: '#8C7A6B', fontWeight: 'bold' }}>#{user.id}</td>
+                          <td style={{ padding: '20px 24px', fontSize: '14px', color: '#5C4E43', fontWeight: 'bold' }}>{user.name}</td>
+                          <td style={{ padding: '20px 24px', fontSize: '14px', color: '#5C4E43' }}>{user.email}</td>
+                          <td style={{ padding: '20px 24px' }}>
+                            <select
+                              value={user.role}
+                              onChange={(e) => handleRoleUpdate(user.id, e.target.value)}
+                              style={getRoleSelectStyle(user.role)}
+                            >
+                              <option value="customer">Customer</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '20px 24px' }}>
+                            <button onClick={() => setUserDeleteConfirm({ isOpen: true, targetId: user.id, targetName: user.name })} style={{ padding: '8px 16px', border: '1px solid #d97777', backgroundColor: '#ffffff', color: '#d97777', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>ลบบัญชี</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================= Reviews ======================= */}
+        {activeTab === 'reviews' && (
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #E8E1D9', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            <ManageReviews />
+          </div>
+        )}
+
+        {/* ======================= Promotions ======================= */}
+        {activeTab === 'promotions' && (
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #E8E1D9', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+            <ManagePromotions />
+          </div>
+        )}
+
+        {/* ======================= Modals (ยืนยันการลบ) ======================= */}
+        {/* Modal: ลบสินค้า */}
+        {deleteConfirm.isOpen && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+            <div style={{ backgroundColor: '#fff', padding: '32px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: '40px', marginBottom: '16px' }}>🗑️</div>
+              <h3 style={{ margin: '0 0 8px 0', color: '#5C4E43', fontSize: '20px', fontWeight: 'bold' }}>ยืนยันการลบสินค้า</h3>
+              <p style={{ margin: '0 0 24px 0', color: '#8C7A6B', fontSize: '14px' }}>คุณต้องการลบ <b>"{deleteConfirm.targetName}"</b> ออกจากคลังใช่หรือไม่?</p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button onClick={() => setDeleteConfirm({ isOpen: false, targetId: null, targetName: '' })} style={{ padding: '12px 24px', border: '1px solid #E8E1D9', backgroundColor: '#F0EBE6', color: '#5C4E43', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>ยกเลิก</button>
+                <button onClick={executeDeleteProduct} style={{ padding: '12px 24px', border: 'none', backgroundColor: '#d97777', color: '#fff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>ยืนยันลบ</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: ลบผู้ใช้งาน */}
+        {userDeleteConfirm.isOpen && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+            <div style={{ backgroundColor: '#fff', padding: '32px', borderRadius: '16px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+              <div style={{ fontSize: '40px', marginBottom: '16px' }}>🚨</div>
+              <h3 style={{ margin: '0 0 8px 0', color: '#5C4E43', fontSize: '20px', fontWeight: 'bold' }}>ยืนยันการลบผู้ใช้</h3>
+              <p style={{ margin: '0 0 24px 0', color: '#8C7A6B', fontSize: '14px' }}>คุณกำลังจะลบผู้ใช้ <b>"{userDeleteConfirm.targetName}"</b> การกระทำนี้ไม่สามารถย้อนกลับได้ ดำเนินการต่อหรือไม่?</p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button onClick={() => setUserDeleteConfirm({ isOpen: false, targetId: null, targetName: '' })} style={{ padding: '12px 24px', border: '1px solid #E8E1D9', backgroundColor: '#F0EBE6', color: '#5C4E43', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>ยกเลิก</button>
+                <button onClick={executeDeleteUser} style={{ padding: '12px 24px', border: 'none', backgroundColor: '#d97777', color: '#fff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>ยืนยันลบผู้ใช้</button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
-
-      {/* ==========================================
-          Modal: แก้ไขสินค้า (Edit) 
-          ========================================== */}
-      {productModal.isOpen && productModal.mode === 'edit' && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(92, 78, 67, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '20px' }}>
-          
-          <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '650px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', borderRadius: '24px', border: '1px solid #E8E1D9', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', overflow: 'hidden' }}>
-            
-            {/* Header */}
-            <div style={{ padding: '20px 32px', borderBottom: '1px solid #E8E1D9', backgroundColor: '#ffffff', zIndex: 1 }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '900', margin: 0, color: '#5C4E43' }}>📝 แก้ไขข้อมูลสินค้าคลัง</h3>
-            </div>
-
-            {/* Scrollable Body */}
-            <div style={{ padding: '24px 32px', overflowY: 'auto', flex: 1 }}>
-              <form id="editProductForm" onSubmit={handleSaveProduct} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ชื่อรุ่นรองเท้า</label>
-                  <input required type="text" value={productModal.name} onChange={e => setProductModal({...productModal, name: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>แบรนด์สินค้า</label>
-                    {!productModal.isCustomBrand ? (
-                      <select 
-                        value={productModal.brand} 
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW') {
-                            setProductModal(prev => ({ ...prev, isCustomBrand: true, brand: '' }));
-                          } else {
-                            const newBrand = e.target.value;
-                            setProductModal(prev => ({ ...prev, brand: newBrand }));
-                          }
-                        }} 
-                        style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#ffffff', color: '#5C4E43' }}
-                      >
-                        {uniqueBrands.map(b => <option key={b} value={b}>{b}</option>)}
-                        <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#8C7A6B' }}>➕ เพิ่มแบรนด์ใหม่...</option>
-                      </select>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <input 
-                          autoFocus type="text" placeholder="พิมพ์แบรนด์ใหม่..." value={productModal.brand} 
-                          onChange={e => {
-                            const newBrand = e.target.value;
-                            setProductModal(prev => ({ ...prev, brand: newBrand }));
-                          }} 
-                          style={{ flex: 1, padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} 
-                        />
-                        <button 
-                          type="button" 
-                          onClick={() => {
-                            const fallback = uniqueBrands.includes(productModal.brand) && productModal.brand !== '' ? productModal.brand : uniqueBrands[0];
-                            setProductModal(prev => ({ ...prev, isCustomBrand: false, brand: fallback }));
-                          }}
-                          style={{ padding: '0 16px', backgroundColor: '#F0EBE6', border: 'none', borderRadius: '12px', color: '#8C7A6B', fontWeight: 'bold', cursor: 'pointer' }}
-                        >
-                          ยกเลิก
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ราคา (บาท)</label>
-                    <input required type="number" value={productModal.price} onChange={e => setProductModal({...productModal, price: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>รหัส SKU (ล็อกอัตโนมัติ)</label>
-                    <input disabled type="text" value={productModal.sku} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', backgroundColor: '#F8F6F3', color: '#8C7A6B', cursor: 'not-allowed', fontWeight: 'bold' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>โทนสีสินค้า</label>
-                    <input type="text" value={productModal.color} onChange={e => setProductModal({...productModal, color: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
-                  </div>
-                </div>
-
-                {/* 🌟 ช่องพิมพ์ วันที่วางจำหน่าย (ดึงค่ามาแล้ว) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>ภาพลิงก์พรีวิว URL</label>
-                    <input type="text" value={productModal.image} onChange={e => setProductModal({...productModal, image: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '8px' }}>วันที่วางจำหน่าย</label>
-                    <input type="text" value={productModal.releaseDate} onChange={e => setProductModal({...productModal, releaseDate: e.target.value})} style={{ width: '100%', padding: '14px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', outline: 'none', color: '#5C4E43' }} placeholder="เช่น 19/07/2569" />
-                  </div>
-                </div>
-
-                {/* ตารางสต็อก */}
-                <div style={{ backgroundColor: '#F8F6F3', padding: '20px', borderRadius: '16px', border: '1px solid #E8E1D9' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '16px' }}>จัดการสต็อกสินค้าแยกตามไซส์ (จำนวนคู่)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '12px' }}>
-                    {euSizes.map(size => (
-                      <div key={size} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <span style={{ fontSize: '12px', color: '#5C4E43', textAlign: 'center', fontWeight: 'bold' }}>EU {size}</span>
-                        <input type="number" min="0" value={productModal.stock[size] !== undefined ? productModal.stock[size] : ''} onChange={e => handleStockChange(size, e.target.value)} style={{ width: '100%', padding: '10px 6px', border: '1px solid #E8E1D9', borderRadius: '8px', outline: 'none', color: '#5C4E43', textAlign: 'center', fontSize: '13px' }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            {/* Footer / Buttons */}
-            <div style={{ padding: '20px 32px', borderTop: '1px solid #E8E1D9', backgroundColor: '#F8F6F3', display: 'flex', gap: '12px' }}>
-              <button type="button" onClick={() => setProductModal({...productModal, isOpen: false})} style={{ flex: 1, padding: '14px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
-                ยกเลิก
-              </button>
-              <button type="submit" form="editProductForm" style={{ flex: 1, padding: '14px', border: 'none', backgroundColor: '#8C7A6B', color: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
-                บันทึกการเปลี่ยนแปลง
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirm */}
-      {deleteConfirm.isOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(92, 78, 67, 0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '16px' }}>
-          <div style={{ backgroundColor: '#ffffff', width: '100%', maxWidth: '400px', borderRadius: '24px', border: '1px solid #E8E1D9', padding: '32px', textAlign: 'center', boxShadow: '0 10px 30px rgba(92, 78, 67, 0.15)' }}>
-            <span style={{ fontSize: '32px', display: 'block', marginBottom: '16px' }}>⚠️</span>
-            <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 12px 0', color: '#5C4E43' }}>ยืนยันลบข้อมูลสินค้า</h3>
-            <p style={{ fontSize: '14px', color: '#8C7A6B', lineHeight: '1.5', margin: '0 0 24px 0' }}>แน่ใจใช่หรือไม่ที่จะลบ <strong style={{ color: '#5C4E43' }}>{deleteConfirm.targetName}</strong> ออกจากระบบ?</p>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setDeleteConfirm({ isOpen: false, targetId: null, targetName: '' })} style={{ flex: 1, padding: '14px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>ยกเลิก</button>
-              <button onClick={executeDeleteProduct} style={{ flex: 1, padding: '14px', border: 'none', backgroundColor: '#d97777', color: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>ยืนยันลบถาวร</button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

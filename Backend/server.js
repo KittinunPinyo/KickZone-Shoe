@@ -814,53 +814,100 @@ app.put('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
     
     try {
-        const { id } = req.params;
-        const { code, description, discountType, discountValue, maxUses, startDate, endDate, isActive } = req.body;
-
+        const { code, description, discountType, discountValue, maxUses, startDate, endDate, is_active } = req.body;
         const result = await pool.query(
             `UPDATE promotions 
-             SET code = $1, description = $2, discount_type = $3, discount_value = $4, 
-                 max_uses = $5, start_date = $6, end_date = $7, is_active = $8, updated_at = NOW()
-             WHERE id = $9
-             RETURNING *`,
-            [code, description, discountType, discountValue, maxUses || null, startDate, endDate || null, isActive !== false, id]
+             SET code=$1, description=$2, discount_type=$3, discount_value=$4, max_uses=$5, start_date=$6, end_date=$7, is_active=$8, updated_at=CURRENT_TIMESTAMP
+             WHERE id=$9 RETURNING *`,
+            [code, description, discountType, discountValue, maxUses, startDate, endDate, is_active, req.params.id]
         );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });
-        }
-
-        res.json({ 
-            success: true, 
-            message: 'แก้ไขโปรโมชั่นสำเร็จ',
-            promotion: result.rows[0] 
-        });
+        
+        if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });
+        res.json({ success: true, promotion: result.rows[0] });
     } catch (error) {
         console.error("Update Promotion Error:", error);
         res.status(500).json({ error: 'แก้ไขโปรโมชั่นล้มเหลว' });
     }
 });
 
-// 6) แอดมินลบโปรโมชั่น
-app.delete('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
+
+// ==========================================
+// 8. API Routes สำหรับระบบจัดการผู้ใช้งาน (Manage Users)
+// ==========================================
+
+// 1) แอดมินดึงข้อมูลผู้ใช้งานทั้งหมด
+app.get('/api/users', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
     
     try {
+        // ดึงเฉพาะข้อมูลทั่วไป ไม่ดึงรหัสผ่าน (password) ออกมาเพื่อความปลอดภัย
+        const result = await pool.query('SELECT id, name, email, role FROM users ORDER BY id ASC');
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Fetch Users Error:", err);
+        res.status(500).json({ error: 'ดึงข้อมูลผู้ใช้งานล้มเหลว' });
+    }
+});
+
+// 2) แอดมินแก้ไขสิทธิ์ (Role) ของผู้ใช้งาน
+app.patch('/api/users/:id/role', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['admin', 'customer'].includes(role)) {
+        return res.status(400).json({ error: 'ข้อมูลประเภทสิทธิ์ไม่ถูกต้อง' });
+    }
+
+    // ระบบป้องกัน: ป้องกันไม่ให้แอดมินเปลี่ยนสิทธิ์ของตัวเอง 
+    // (ป้องกันกรณีเผลอเปลี่ยนตัวเองเป็น customer แล้วจะไม่มีใครเป็นแอดมินเลย)
+    if (parseInt(id) === req.user.id) {
+        return res.status(400).json({ error: 'ไม่อนุญาตให้ลดสิทธิ์บัญชีของตัวคุณเอง' });
+    }
+
+    try {
         const result = await pool.query(
-            'DELETE FROM promotions WHERE id = $1 RETURNING id',
-            [req.params.id]
+            'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, role',
+            [role, id]
         );
+
+        if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้งานนี้ในระบบ' });
         
-        if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });
-        res.json({ success: true, message: 'ลบโปรโมชั่นสำเร็จ' });
-    } catch (error) {
-        console.error("Delete Promotion Error:", error);
-        res.status(500).json({ error: 'ลบโปรโมชั่นล้มเหลว' });
+        res.json({ success: true, message: 'อัปเดตสิทธิ์สำเร็จ', user: result.rows[0] });
+    } catch (err) {
+        console.error("Update Role Error:", err);
+        res.status(500).json({ error: 'อัปเดตสิทธิ์ผู้ใช้ล้มเหลว' });
+    }
+});
+
+// 3) แอดมินลบผู้ใช้งานออกจากระบบ
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
+    
+    const { id } = req.params;
+
+    // ระบบป้องกัน: ป้องกันไม่ให้แอดมินลบบัญชีของตัวเอง
+    if (parseInt(id) === req.user.id) {
+        return res.status(400).json({ error: 'ไม่อนุญาตให้ลบบัญชีที่กำลังใช้งานอยู่' });
+    }
+
+    try {
+        const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+        
+        if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้งานนี้ในระบบ' });
+        
+        res.json({ success: true, message: 'ลบผู้ใช้งานออกจากระบบเรียบร้อยแล้ว' });
+    } catch (err) {
+        console.error("Delete User Error:", err);
+        res.status(500).json({ error: 'ลบผู้ใช้งานล้มเหลว อาจมีข้อมูลอื่นผูกพันอยู่' });
     }
 });
 
 // ==========================================
-// 8. เปิดพอร์ตใช้งาน Server
+// 9. Start Server
 // ==========================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`KickZone Backend is running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+});
