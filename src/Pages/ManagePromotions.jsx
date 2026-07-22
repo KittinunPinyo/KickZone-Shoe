@@ -18,7 +18,9 @@ const ManagePromotions = () => {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     isFlashSale: false,
-    isActive: true
+    isActive: true,
+    minimumOrderAmount: '',
+    maximumOrderAmount: ''
   });
 
   useEffect(() => {
@@ -52,7 +54,9 @@ const ManagePromotions = () => {
       startDate: new Date().toISOString().split('T')[0],
       endDate: '',
       isFlashSale: false,
-      isActive: true
+      isActive: true,
+      minimumOrderAmount: '',
+      maximumOrderAmount: ''
     });
     setEditingId(null);
   };
@@ -97,7 +101,9 @@ const ManagePromotions = () => {
       startDate: promo.start_date ? promo.start_date.split('T')[0] : '',
       endDate: promo.end_date ? promo.end_date.split('T')[0] : '',
       isFlashSale: promo.is_flash_sale || false,
-      isActive: promo.is_active
+      isActive: promo.is_active,
+      minimumOrderAmount: promo.minimum_order_amount || '',
+      maximumOrderAmount: promo.maximum_order_amount || ''
     });
     setEditingId(promo.id);
     setShowForm(true);
@@ -307,6 +313,54 @@ const ManagePromotions = () => {
                   value={formData.maxUses}
                   onChange={(e) => setFormData({ ...formData, maxUses: e.target.value })}
                   placeholder="ไม่จำกัด"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+              {/* Minimum Order Amount */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#475569' }}>
+                  ยอดสั่งซื้อขั้นต่ำ (บาท)
+                </label>
+                <input
+                  type="number"
+                  value={formData.minimumOrderAmount}
+                  onChange={(e) => setFormData({ ...formData, minimumOrderAmount: e.target.value })}
+                  placeholder="ไม่มีขีดจำกัด"
+                  step="0.01"
+                  min="0"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Maximum Order Amount */}
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '6px', color: '#475569' }}>
+                  ยอดสั่งซื้อสูงสุด (บาท)
+                </label>
+                <input
+                  type="number"
+                  value={formData.maximumOrderAmount}
+                  onChange={(e) => setFormData({ ...formData, maximumOrderAmount: e.target.value })}
+                  placeholder="ไม่มีขีดจำกัด"
+                  step="0.01"
+                  min="0"
                   style={{
                     width: '100%',
                     padding: '10px',

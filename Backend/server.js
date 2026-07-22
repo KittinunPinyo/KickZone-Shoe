@@ -153,6 +153,8 @@ const initializeDatabase = async () => {
             );
         `);
         await pool.query(`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS is_flash_sale BOOLEAN NOT NULL DEFAULT false;`);
+        await pool.query(`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS minimum_order_amount NUMERIC(10, 2) DEFAULT 0;`);
+        await pool.query(`ALTER TABLE promotions ADD COLUMN IF NOT EXISTS maximum_order_amount NUMERIC(10, 2) DEFAULT NULL;`);
         console.log("✅ NeonDB: ตรวจสอบและจัดการตาราง 'promotions' เรียบร้อย!");
 
         // 4. ตาราง Products
@@ -192,6 +194,7 @@ const initializeDatabase = async () => {
             await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock JSONB DEFAULT '{}'::jsonb;`);
             await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_type VARCHAR(20) NOT NULL DEFAULT 'fixed';`);
             await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_value NUMERIC(10, 2) NOT NULL DEFAULT 0;`);
+            await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS promotion_tag VARCHAR(50);`);
             await pool.query(`
                 DO $$
                 BEGIN
@@ -375,12 +378,12 @@ app.get('/api/products', async (req, res) => {
 // เพิ่มสินค้าใหม่
 app.post('/api/products', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin เท่านั้น' });
-    const { name, brand, price, image, sku, color, releaseDate, stock, discountType, discountValue } = req.body;
+    const { name, brand, price, image, sku, color, releaseDate, stock, discountType, discountValue, promotionTag } = req.body;
 
     try {
         const result = await pool.query(
-            'INSERT INTO products (name, brand, price, image, sku, color, release_date, stock, discount_type, discount_value) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-            [name, brand, price, image, sku, color, releaseDate, JSON.stringify(stock), discountType || 'fixed', discountValue || 0]
+            'INSERT INTO products (name, brand, price, image, sku, color, release_date, stock, discount_type, discount_value, promotion_tag) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+            [name, brand, price, image, sku, color, releaseDate, JSON.stringify(stock), discountType || 'fixed', discountValue || 0, promotionTag || null]
         );
         res.status(201).json({ message: 'เพิ่มสินค้าเรียบร้อย', product: result.rows[0] });
     } catch (err) {
@@ -393,12 +396,12 @@ app.post('/api/products', authenticateToken, async (req, res) => {
 app.put('/api/products/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'ไม่มีสิทธิ์' });
     const { id } = req.params;
-    const { name, brand, price, image, sku, color, releaseDate, stock, discountType, discountValue } = req.body;
+    const { name, brand, price, image, sku, color, releaseDate, stock, discountType, discountValue, promotionTag } = req.body;
 
     try {
         const result = await pool.query(
-            'UPDATE products SET name=$1, brand=$2, price=$3, image=$4, sku=$5, color=$6, release_date=$7, stock=$8, discount_type=$9, discount_value=$10 WHERE id=$11 RETURNING *',
-            [name, brand, price, image, sku, color, releaseDate, JSON.stringify(stock), discountType || 'fixed', discountValue || 0, id]
+            'UPDATE products SET name=$1, brand=$2, price=$3, image=$4, sku=$5, color=$6, release_date=$7, stock=$8, discount_type=$9, discount_value=$10, promotion_tag=$11 WHERE id=$12 RETURNING *',
+            [name, brand, price, image, sku, color, releaseDate, JSON.stringify(stock), discountType || 'fixed', discountValue || 0, promotionTag || null, id]
         );
         res.json(result.rows[0]);
     } catch (err) {
@@ -808,6 +811,20 @@ app.post('/api/promotions/validate', async (req, res) => {
             return res.status(400).json({ error: 'โปรโมชั่นนี้ใช้งบประมาณหมดแล้ว' });
         }
 
+        // ตรวจสอบยอดสั่งซื้อขั้นต่ำ
+        if (promo.minimum_order_amount && cartTotal < promo.minimum_order_amount) {
+            return res.status(400).json({ 
+                error: `โปรโมชั่นนี้ต้องมียอดสั่งซื้อขั้นต่ำ ${promo.minimum_order_amount} บาท (ยอดของคุณ: ${cartTotal} บาท)` 
+            });
+        }
+
+        // ตรวจสอบยอดสั่งซื้อสูงสุด
+        if (promo.maximum_order_amount && cartTotal > promo.maximum_order_amount) {
+            return res.status(400).json({ 
+                error: `โปรโมชั่นนี้มียอดสั่งซื้อสูงสุด ${promo.maximum_order_amount} บาท (ยอดของคุณ: ${cartTotal} บาท)` 
+            });
+        }
+
         let discountAmount = 0;
         if (promo.discount_type === 'percentage') {
             discountAmount = (cartTotal * promo.discount_value) / 100;
@@ -847,7 +864,8 @@ app.get('/api/admin/promotions', authenticateToken, async (req, res) => {
     try {
         const query = `
             SELECT id, code, description, discount_type, discount_value, max_discount,
-                   max_uses, current_uses, start_date, end_date, is_flash_sale, is_active, created_at, updated_at
+                   max_uses, current_uses, start_date, end_date, is_flash_sale, is_active, created_at, updated_at,
+                   minimum_order_amount, maximum_order_amount
             FROM promotions
             ORDER BY created_at DESC
         `;
@@ -875,7 +893,9 @@ app.post('/api/admin/promotions', authenticateToken, async (req, res) => {
             endDate,
             isFlashSale,
             isActive,
-            is_active
+            is_active,
+            minimumOrderAmount,
+            maximumOrderAmount
         } = req.body;
 
         if (!code || !description || !discountType || !discountValue) {
@@ -892,12 +912,14 @@ app.post('/api/admin/promotions', authenticateToken, async (req, res) => {
         const startDateValue = startDate ? startDate : new Date();
         const endDateValue = endDate ? endDate : null;
         const flashSaleValue = typeof isFlashSale === 'boolean' ? isFlashSale : false;
+        const minOrderValue = minimumOrderAmount ? Number(minimumOrderAmount) : 0;
+        const maxOrderValue = maximumOrderAmount ? Number(maximumOrderAmount) : null;
 
         const result = await pool.query(
-            `INSERT INTO promotions (code, description, discount_type, discount_value, max_discount, max_uses, start_date, end_date, is_flash_sale, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            `INSERT INTO promotions (code, description, discount_type, discount_value, max_discount, max_uses, start_date, end_date, is_flash_sale, is_active, minimum_order_amount, maximum_order_amount)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
-            [code, description, discountType, discountValue, maxDiscountValue, maxUsesValue, startDateValue, endDateValue, flashSaleValue, active]
+            [code, description, discountType, discountValue, maxDiscountValue, maxUsesValue, startDateValue, endDateValue, flashSaleValue, active, minOrderValue, maxOrderValue]
         );
 
         res.status(201).json({ 
@@ -930,7 +952,9 @@ app.put('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
             endDate,
             isFlashSale,
             isActive,
-            is_active
+            is_active,
+            minimumOrderAmount,
+            maximumOrderAmount
         } = req.body;
 
         const active = typeof isActive === 'boolean' ? isActive : (typeof is_active === 'boolean' ? is_active : true);
@@ -939,12 +963,14 @@ app.put('/api/admin/promotions/:id', authenticateToken, async (req, res) => {
         const startDateValue = startDate ? startDate : null;
         const endDateValue = endDate ? endDate : null;
         const flashSaleValue = typeof isFlashSale === 'boolean' ? isFlashSale : false;
+        const minOrderValue = minimumOrderAmount ? Number(minimumOrderAmount) : 0;
+        const maxOrderValue = maximumOrderAmount ? Number(maximumOrderAmount) : null;
 
         const result = await pool.query(
             `UPDATE promotions 
-             SET code=$1, description=$2, discount_type=$3, discount_value=$4, max_discount=$5, max_uses=$6, start_date=$7, end_date=$8, is_flash_sale=$9, is_active=$10, updated_at=CURRENT_TIMESTAMP
-             WHERE id=$11 RETURNING *`,
-            [code, description, discountType, discountValue, maxDiscountValue, maxUsesValue, startDateValue, endDateValue, flashSaleValue, active, req.params.id]
+             SET code=$1, description=$2, discount_type=$3, discount_value=$4, max_discount=$5, max_uses=$6, start_date=$7, end_date=$8, is_flash_sale=$9, is_active=$10, minimum_order_amount=$11, maximum_order_amount=$12, updated_at=CURRENT_TIMESTAMP
+             WHERE id=$13 RETURNING *`,
+            [code, description, discountType, discountValue, maxDiscountValue, maxUsesValue, startDateValue, endDateValue, flashSaleValue, active, minOrderValue, maxOrderValue, req.params.id]
         );
         
         if (result.rows.length === 0) return res.status(404).json({ error: 'ไม่พบโปรโมชั่นนี้' });

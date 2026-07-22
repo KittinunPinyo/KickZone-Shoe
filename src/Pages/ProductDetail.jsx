@@ -120,7 +120,14 @@ export default function ProductDetail({ products, currentUser, handleAddToCart }
           {/* ฝั่งซ้าย: รูปภาพสินค้า */}
           <div className="col-lg-7">
             <div className="position-sticky" style={{ top: '20px' }}>
-              <div className="bg-white rounded-4 d-flex align-items-center justify-content-center p-4 shadow-sm" style={{ backgroundColor: '#F0EBE6', minHeight: '400px' }}>
+              <div className="bg-white rounded-4 d-flex align-items-center justify-content-center p-4 shadow-sm position-relative" style={{ backgroundColor: '#F0EBE6', minHeight: '400px' }}>
+                {Number(product.discountValue ?? product.discount_value ?? 0) > 0 && (
+                  <div className="position-absolute" style={{ top: '20px', left: '20px', zIndex: 10 }}>
+                    <span className="badge rounded-pill fw-bold" style={{ backgroundColor: '#FF6B6B', color: '#ffffff', padding: '8px 16px', fontSize: '12px' }}>
+                      ⚡ FLASH SALE
+                    </span>
+                  </div>
+                )}
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="img-fluid" style={{ maxHeight: '400px', width: '100%', objectFit: 'contain' }} />
                 ) : (

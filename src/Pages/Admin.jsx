@@ -84,7 +84,7 @@ export default function Admin() {
   const [updatingId, setUpdatingId] = useState(null);
 
   const [productModal, setProductModal] = useState({
-    isOpen: false, mode: 'add', id: null, name: '', brand: 'adidas', price: '', sku: '', color: '', releaseDate: '', stock: initialStock, image: '', discountType: 'fixed', discountValue: 0, isCustomBrand: false
+    isOpen: false, mode: 'add', id: null, name: '', brand: 'adidas', price: '', sku: '', color: '', releaseDate: '', stock: initialStock, image: '', discountType: 'fixed', discountValue: 0, promotionTag: '', isCustomBrand: false
   });
 
   const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, targetId: null, targetName: '' });
@@ -205,7 +205,7 @@ export default function Admin() {
     const defaultBrand = uniqueBrands[0] || 'adidas';
     setProductModal({
       isOpen: true, mode: 'add', id: null, name: '', brand: defaultBrand, price: '', 
-      sku: generateSKU(defaultBrand), color: '', releaseDate: '', stock: { ...initialStock }, image: '', discountType: 'fixed', discountValue: 0, isCustomBrand: false
+      sku: generateSKU(defaultBrand), color: '', releaseDate: '', stock: { ...initialStock }, image: '', discountType: 'fixed', discountValue: 0, promotionTag: '', isCustomBrand: false
     });
   };
 
@@ -222,7 +222,7 @@ export default function Admin() {
     const fetchedReleaseDate = product.releaseDate || product.release_date || '';
 
     setProductModal({
-      isOpen: true, mode: 'edit', id: product.id, name: product.name || '', brand: product.brand || uniqueBrands[0], price: product.price || '', sku: product.sku || '', color: fetchedColor, releaseDate: fetchedReleaseDate, stock: parsedStock, image: product.image || '', discountType: product.discount_type || product.discountType || 'fixed', discountValue: Number(product.discount_value ?? product.discountValue ?? 0), isCustomBrand: false
+      isOpen: true, mode: 'edit', id: product.id, name: product.name || '', brand: product.brand || uniqueBrands[0], price: product.price || '', sku: product.sku || '', color: fetchedColor, releaseDate: fetchedReleaseDate, stock: parsedStock, image: product.image || '', discountType: product.discount_type || product.discountType || 'fixed', discountValue: Number(product.discount_value ?? product.discountValue ?? 0), promotionTag: product.promotion_tag || '', isCustomBrand: false
     });
   };
 
@@ -246,7 +246,8 @@ export default function Admin() {
       releaseDate: productModal.releaseDate || '-',
       stock: finalStock,
       discountType: productModal.discountType,
-      discountValue: Number(productModal.discountValue) || 0
+      discountValue: Number(productModal.discountValue) || 0,
+      promotionTag: productModal.promotionTag || null
     };
 
     const url = productModal.mode === 'add' ? `${API_URL}/products` : `${API_URL}/products/${productModal.id}`;
@@ -548,6 +549,18 @@ export default function Admin() {
                         {productModal.discountType === 'percentage' ? 'เช่น 20 = ลด 20%' : 'เช่น 300 = ลด 300 บาท'}
                       </div>
                     </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#8C7A6B', marginBottom: '6px' }}>ป้ายโปรโมชั่น (ทางเลือก)</label>
+                    <select value={productModal.promotionTag} onChange={e => setProductModal({...productModal, promotionTag: e.target.value})} style={{ width: '100%', padding: '12px 16px', border: '1px solid #E8E1D9', borderRadius: '12px', backgroundColor: '#ffffff', outline: 'none', color: '#5C4E43' }}>
+                      <option value="">-- ไม่มีป้าย --</option>
+                      <option value="HOT DEAL">🔥 HOT DEAL</option>
+                      <option value="NEW">✨ NEW</option>
+                      <option value="BESTSELLER">⭐ BESTSELLER</option>
+                      <option value="LIMITED">🎁 LIMITED</option>
+                      <option value="TOP PICK">👑 TOP PICK</option>
+                    </select>
+                    <div style={{ fontSize: '11px', color: '#8C7A6B', marginTop: '4px' }}>เลือกป้ายเพื่อแสดงบนสินค้า</div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
                     <button type="button" onClick={() => setProductModal({...productModal, isOpen: false})} style={{ padding: '12px 24px', border: '1px solid #8C7A6B', color: '#8C7A6B', backgroundColor: '#ffffff', borderRadius: '50px', fontWeight: 'bold', cursor: 'pointer' }}>ยกเลิก</button>
