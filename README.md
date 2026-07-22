@@ -110,7 +110,7 @@ npm run dev
 
 | เอกสาร | เนื้อหา |
 |--------|---------|
-| [docs/analysis-design.md](./docs/analysis-design.md) | เอกสารวิเคราะห์และออกแบบ: Persona · Use Case · Class · Sequence · Architecture |
+| [docs/analysis-design.md](./docs/analysis-design.md) | เอกสารวิเคราะห์และออกแบบ: Persona · Use Case Diagram  · Class Diagram  · Sequence Diagram  · Data Schema (JSON) |
 | [docs/architecture.md](./docs/architecture.md) | กระบวนการสถาปัตยกรรมระบบ (System Architecture) |
 | [Wireframe (Figma)](https://www.figma.com/design/tD4Ky3k96PDIJlJKNqx4En/Untitled?node-id=0-1&t=E7NM5Sl3AWCCfG5d-1) | ออกแบบ Wireframe (หน้าหลัก, รายการสินค้า, รายละเอียดสินค้า, ตะกร้า, Checkout/ชำระเงิน) ผ่าน Figma |
 
