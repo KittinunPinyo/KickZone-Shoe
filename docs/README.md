@@ -7,6 +7,12 @@
 
 ---
 
+<p align="center">
+  <img src="./docs/GroupProjectApprovalRequestForm.png" alt="GroupProject" width="420" />
+</p>
+
+---
+
 ## โครงงานนี้คืออะไร
 
 **Kick Zone (คิ๊กโซน)** ระบบเว็บไซต์ร้านค้าออนไลน์สำหรับจัดจำหน่ายรองเท้า
