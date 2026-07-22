@@ -51,35 +51,6 @@
 ![Use Case Diagram](UseCase.png)
 
 ```mermaid
-flowchart LR
-    %% Actors Definition
-    subgraph Actors ["👥 ผู้ใช้งานระบบ (Actors)"]
-        Customer["👤 ลูกค้า (Customer)"]
-        Admin["🔧 ผู้ดูแลระบบ (Admin)"]
-        GoogleAuth["🌐 Google OAuth"]
-    end
-
-    %% Boundary System
-    subgraph KickZoneSystem ["👟 KickZone Shoe System"]
-
-        subgraph ModAuth ["1. ระบบยืนยันตัวตน (Authentication)"]
-            UC1(["UC-01: สมัครสมาชิก (Register)"])
-            UC2(["UC-02: เข้าสู่ระบบ (Login)"])
-            UC3(["UC-03: เข้าสู่ระบบด้วย Google (Google Login)"])
-        end
-
-        subgraph ModProduct ["2. ระบบสินค้าและค้นหา (Product & Search)"]
-            UC4(["UC-04: ค้นหาและกรองรองเท้าตามแบรนด์/ราคา"])
-            UC5(["UC-05: ดูรายละเอียดสินค้า & สต็อกไซส์ (EU Size)"])
-            UC6(["UC-06: จัดการตะกร้าสินค้า (Cart)"])
-            UC7(["UC-07: บันทึกสินค้าที่ชอบ (Wishlist)"])
-        end
-
-        subgraph ModOrder ["3. ระบบสั่งซื้อและชำระเงิน (Orders & Payment)"]
-            UC8(["UC-08: สั่งซื้อสินค้า & ใช้โค้ดส่วนลด (Checkout & Promo)"])
-            UC9(["UC-09: อัปโหลดสลิปโอนเงิน (Upload Slip)"])
-            UC10(["UC-10: ติดตามสถานะคำสั่งซื้อ & พัสดุ (Order Tracking)"])
-        end
 
         subgraph ModReview ["4. ระบบรีวิวสินค้า (Product Reviews)"]
             UC11(["UC-11: เขียนรีวิวสินค้าและให้คะแนนดาว"])
@@ -423,27 +394,6 @@ sequenceDiagram
 
 ---
 
-🗄️ โครงสร้างข้อมูล (JSON Schema)
-ระบบ KickZone Shoe ใช้โครงสร้างข้อมูล JSON สำหรับแลกเปลี่ยนข้อมูลระหว่าง Frontend (React) และ Backend (Express RESTful API) รวมถึงการบันทึกข้อมูลในฐานข้อมูล PostgreSQL (JSONB):
-
-เอกสารฉบับเต็มของ JSON Schema สามารถดูได้ที่ [docs/json-schema.json](./docs/json-schema.json)
-
-📌 สรุป Schema สำหรับ Entities หลัก:
-#### 1. Product Schema (สินค้าและสต็อกตามไซส์)
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Product",
-  "type": "object",
-  "properties": {
-    "id": { "type": "integer" },
-    "name": { "type": "string" },
-    "brand": { "type": "string" },
-    "price": { "type": "number", "minimum": 0 },
-    "image": { "type": "string" },
-    "sku": { "type": "string" },
-    "color": { "type": "string" },
-    "releaseDate": { "type": "string" },
-    "stock": {
       "type": "object",
       "additionalProperties": { "type": "integer", "minimum": 0 },
       "description": "สต็อกแยกตาม EU Size เช่น {'38': 10, '39': 5, '40': 0}"
@@ -498,4 +448,5 @@ sequenceDiagram
 }
 
 ---
+
 **ดู:** [System Architecture →](architecture.md)
