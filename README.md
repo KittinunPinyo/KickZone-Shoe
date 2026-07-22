@@ -96,7 +96,6 @@
 
 ### 1. การตั้งค่า Backend
 เข้าไปที่โฟลเดอร์ `Backend` และติดตั้งแพ็กเกจ:
-```bash
 cd Backend
 npm install
 node server.js
