@@ -167,8 +167,6 @@ flowchart LR
 
 ส่วนนี้แสดงโครงสร้างข้อมูล ความสัมพันธ์ระหว่าง Class (Relationships) และ Attributes/Methods ที่ใช้ในระบบจัดการร้านรองเท้า KickZone
 
-![Class Diagram](ClassDiagram.png)
-
 ```mermaid
 classDiagram
     direction TB
@@ -301,8 +299,6 @@ classDiagram
 ## 4. แผนภาพลำดับการทำงาน (Sequence Diagram)
 
 ส่วนนี้แสดงลำดับขั้นตอนการสื่อสารและทำงานร่วมกันของระบบต่างๆ ตั้งแต่การค้นหา สั่งซื้อ อัปโหลดสลิป จนถึงการอัปเดตสถานะ
-
-![Sequence Diagram](SequenceDiagram.png)
 
 ```mermaid
 sequenceDiagram
