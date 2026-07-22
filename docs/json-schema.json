@@ -1,0 +1,261 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KickZoneDataSchemas",
+  "description": "JSON Data Schemas for KickZone Shoe E-Commerce System",
+  "definitions": {
+    "User": {
+      "type": "object",
+      "title": "User Schema",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the user"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["customer", "admin"],
+          "default": "customer",
+          "description": "User role in the system"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Product": {
+      "type": "object",
+      "title": "Product Schema",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Unique identifier for the shoe product"
+        },
+        "name": {
+          "type": "string",
+          "description": "Shoe model name"
+        },
+        "brand": {
+          "type": "string",
+          "description": "Brand name (e.g. Nike, Adidas, Puma, Jordan)"
+        },
+        "price": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Base price in THB"
+        },
+        "image": {
+          "type": "string",
+          "description": "Product image URL or file path"
+        },
+        "sku": {
+          "type": "string",
+          "description": "Stock Keeping Unit code"
+        },
+        "color": {
+          "type": "string",
+          "description": "Color scheme / style specification"
+        },
+        "releaseDate": {
+          "type": "string",
+          "description": "Release date or release year string"
+        },
+        "stock": {
+          "type": "object",
+          "description": "Stock quantity map categorized by EU shoe size",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "example": {
+            "38": 10,
+            "39": 5,
+            "40": 0,
+            "41": 8,
+            "42": 12
+          }
+        },
+        "discountType": {
+          "type": "string",
+          "enum": ["fixed", "percentage"],
+          "default": "fixed"
+        },
+        "discountValue": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "promotionTag": {
+          "type": "string",
+          "description": "Promotional badge label (e.g., Flash Sale, Hot Item)"
+        }
+      },
+      "required": ["name", "price", "stock"]
+    },
+    "Order": {
+      "type": "object",
+      "title": "Order Schema",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order tracking ID (e.g., ORD-1721689200000-123)"
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Customer full name"
+        },
+        "customerEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer email"
+        },
+        "shoeModel": {
+          "type": "string",
+          "description": "Ordered product/shoe model title"
+        },
+        "size": {
+          "type": "string",
+          "description": "Selected EU size (e.g., 42)"
+        },
+        "totalAmount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Final total order price in THB"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "default": "PromptPay",
+          "description": "Payment channel used"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["Pending Upload", "Paid", "Rejected", "Refunded"],
+          "default": "Pending Upload"
+        },
+        "orderStatus": {
+          "type": "string",
+          "enum": ["Processing", "Shipping", "Completed", "Cancelled"],
+          "default": "Processing"
+        },
+        "trackingNumber": {
+          "type": "string",
+          "default": "N/A",
+          "description": "Shipping parcel tracking code (e.g. TH-89213)"
+        },
+        "slipUrl": {
+          "type": ["string", "null"],
+          "description": "URL path to uploaded payment slip image"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "customerName", "customerEmail", "shoeModel", "size", "totalAmount"]
+    },
+    "Review": {
+      "type": "object",
+      "title": "Review Schema",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "productId": {
+          "type": "string",
+          "description": "ID of product being reviewed"
+        },
+        "userId": {
+          "type": "integer",
+          "description": "ID of user who authored the review"
+        },
+        "rating": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Star rating from 1 to 5"
+        },
+        "comment": {
+          "type": "string",
+          "description": "Review text feedback"
+        },
+        "image": {
+          "type": ["string", "null"],
+          "description": "Uploaded review photo path"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["productId", "userId", "rating", "comment"]
+    },
+    "Promotion": {
+      "type": "object",
+      "title": "Promotion Schema",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "code": {
+          "type": "string",
+          "description": "Unique promotional discount code (e.g. KICKZONE10)"
+        },
+        "description": {
+          "type": "string"
+        },
+        "discountType": {
+          "type": "string",
+          "enum": ["percentage", "fixed"]
+        },
+        "discountValue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxDiscount": {
+          "type": ["number", "null"]
+        },
+        "maxUses": {
+          "type": ["integer", "null"]
+        },
+        "currentUses": {
+          "type": "integer",
+          "default": 0
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "isFlashSale": {
+          "type": "boolean",
+          "default": false
+        },
+        "isActive": {
+          "type": "boolean",
+          "default": true
+        },
+        "minimumOrderAmount": {
+          "type": "number",
+          "default": 0
+        },
+        "maximumOrderAmount": {
+          "type": ["number", "null"]
+        }
+      },
+      "required": ["code", "discountType", "discountValue"]
+    }
+  }
+}
